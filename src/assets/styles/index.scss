@@ -1,9 +1,11 @@
-@use './mixin.scss';
+﻿@use './mixin.scss';
 @use './transition.scss';
 @use './element-ui.scss';
 @use './sidebar.scss';
 @use './btn.scss';
 @use './ruoyi.scss';
+@use './portal-theme.scss';
+@use './system-modern.scss';
 
 body {
   height: 100%;
@@ -11,7 +13,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-family: Helvetica Neue, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 label {
@@ -120,9 +122,9 @@ aside {
   }
 }
 
-//main-container全局样式
+//main-container鍏ㄥ眬鏍峰紡
 .app-container {
-  padding: 20px;
+  padding: 0;
 }
 
 .components-container {
@@ -177,3 +179,4 @@ aside {
     margin-bottom: 10px;
   }
 }
+

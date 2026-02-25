@@ -1,6 +1,10 @@
 
 <template>
-   <div class="app-container">
+   <PageContainer class="system-management-page" title="Role User Authorization" description="Manage authorized users for the current role.">
+      <template #actions>
+         <el-button type="primary" icon="Plus" @click="openSelectUser" v-hasPermi="['system:role:add']">添加用户</el-button>
+      </template>
+      <template #search>
       <el-form :model="queryParams" ref="queryRef" v-show="showSearch" :inline="true">
          <el-form-item label="用户名称" prop="userName">
             <el-input
@@ -25,17 +29,11 @@
             <el-button icon="Refresh" @click="resetQuery">重置</el-button>
          </el-form-item>
       </el-form>
-
+      </template>
+      <template #table>
+      <BaseTable>
+      <template #toolbar>
       <el-row :gutter="10" class="mb8">
-         <el-col :span="1.5">
-            <el-button
-               type="primary"
-               plain
-               icon="Plus"
-               @click="openSelectUser"
-               v-hasPermi="['system:role:add']"
-            >添加用户</el-button>
-         </el-col>
          <el-col :span="1.5">
             <el-button
                type="danger"
@@ -56,6 +54,7 @@
          </el-col>
          <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
       </el-row>
+      </template>
 
       <el-table v-loading="loading" :data="userList" @selection-change="handleSelectionChange">
          <el-table-column type="selection" width="55" align="center" />
@@ -87,11 +86,15 @@
          v-model:limit="queryParams.pageSize"
          @pagination="getList"
       />
+      </BaseTable>
+      </template>
       <select-user ref="selectRef" :roleId="queryParams.roleId" @ok="handleQuery" />
-   </div>
+   </PageContainer>
 </template>
 
 <script setup name="AuthUser">
+import PageContainer from "@/components/PageContainer"
+import BaseTable from "@/components/BaseTable"
 import selectUser from "./selectUser"
 import { allocatedUserList, authUserCancel, authUserCancelAll } from "@/api/system/role"
 

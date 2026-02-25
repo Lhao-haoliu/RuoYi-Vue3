@@ -1,0 +1,22 @@
+{
+  "banner": {
+    "greeting": "欢迎回来",
+    "subTitle": "指挥与报表一体化门户，今日运行状态稳定。"
+  },
+  "overview": [
+    { "label": "任务总数", "value": 1280, "trend": "+12.4%" },
+    { "label": "今日新增", "value": 96, "trend": "+8.2%" },
+    { "label": "执行中", "value": 37, "trend": "-3.1%" },
+    { "label": "异常告警", "value": 8, "trend": "+1.8%" }
+  ],
+  "statusDistribution": [
+    { "name": "Success", "value": 72, "color": "#27AE60" },
+    { "name": "Warning", "value": 18, "color": "#F2C94C" },
+    { "name": "Error", "value": 10, "color": "#EB5757" }
+  ],
+  "recentImportant": [
+    { "time": "09:20", "title": "任务批次 #A-912 超时重试", "level": "Warning" },
+    { "time": "10:03", "title": "公版图 v1.1.0 发布完成", "level": "Success" },
+    { "time": "10:58", "title": "北区链路出现间歇性异常", "level": "Error" }
+  ]
+}

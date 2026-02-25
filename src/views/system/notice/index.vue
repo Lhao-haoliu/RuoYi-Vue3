@@ -1,5 +1,9 @@
 <template>
-   <div class="app-container">
+   <PageContainer class="system-management-page" title="Notice Management" description="Publish and maintain system notices.">
+      <template #actions>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:notice:add']">New Notice</el-button>
+      </template>
+      <template #search>
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
          <el-form-item label="公告标题" prop="noticeTitle">
             <el-input
@@ -34,6 +38,9 @@
             <el-button icon="Refresh" @click="resetQuery">重置</el-button>
          </el-form-item>
       </el-form>
+      </template>
+      <template #table>
+      <BaseTable>
 
       <el-row :gutter="10" class="mb8">
          <el-col :span="1.5">
@@ -108,6 +115,8 @@
          v-model:limit="queryParams.pageSize"
          @pagination="getList"
       />
+      </BaseTable>
+      </template>
 
       <!-- 添加或修改公告对话框 -->
       <el-dialog :title="title" v-model="open" width="780px" append-to-body>
@@ -155,10 +164,12 @@
             </div>
          </template>
       </el-dialog>
-   </div>
+   </PageContainer>
 </template>
 
 <script setup name="Notice">
+import PageContainer from "@/components/PageContainer"
+import BaseTable from "@/components/BaseTable"
 import { listNotice, getNotice, delNotice, addNotice, updateNotice } from "@/api/system/notice"
 
 const { proxy } = getCurrentInstance()

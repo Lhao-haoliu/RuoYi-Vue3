@@ -1,5 +1,9 @@
 <template>
-   <div class="app-container">
+   <PageContainer class="system-management-page" title="Dictionary Data" description="Maintain dictionary item data and status.">
+      <template #actions>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:dict:add']">New Item</el-button>
+      </template>
+      <template #search>
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
          <el-form-item label="字典名称" prop="dictType">
             <el-select v-model="queryParams.dictType" style="width: 200px">
@@ -35,6 +39,9 @@
             <el-button icon="Refresh" @click="resetQuery">重置</el-button>
          </el-form-item>
       </el-form>
+      </template>
+      <template #table>
+      <BaseTable>
 
       <el-row :gutter="10" class="mb8">
          <el-col :span="1.5">
@@ -123,6 +130,8 @@
          v-model:limit="queryParams.pageSize"
          @pagination="getList"
       />
+      </BaseTable>
+      </template>
 
       <!-- 添加或修改参数配置对话框 -->
       <el-dialog :title="title" v-model="open" width="500px" append-to-body>
@@ -172,10 +181,12 @@
             </div>
          </template>
       </el-dialog>
-   </div>
+   </PageContainer>
 </template>
 
 <script setup name="Data">
+import PageContainer from "@/components/PageContainer"
+import BaseTable from "@/components/BaseTable"
 import useDictStore from '@/store/modules/dict'
 import { optionselect as getDictOptionselect, getType } from "@/api/system/dict/type"
 import { listData, getData, delData, addData, updateData } from "@/api/system/dict/data"

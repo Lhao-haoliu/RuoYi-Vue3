@@ -1,0 +1,19 @@
+{
+  "tasks": [
+    { "id": 1, "name": "测试任务1", "status": "SUCCESS" },
+    { "id": 2, "name": "测试任务2", "status": "ERROR" }
+  ],
+  "statistics": [
+    { "name": "总任务数", "value": 2 },
+    { "name": "成功任务", "value": 1 },
+    { "name": "失败任务", "value": 1 }
+  ],
+  "startItems": [
+    { "id": 1, "name": "启动批处理-A", "owner": "Commander-A", "status": "READY" },
+    { "id": 2, "name": "启动批处理-B", "owner": "Commander-B", "status": "PENDING" }
+  ],
+  "publicMaps": [
+    { "id": 1, "name": "华东标准图", "version": "v1.0.0", "status": "ACTIVE" },
+    { "id": 2, "name": "华南标准图", "version": "v1.1.0", "status": "DRAFT" }
+  ]
+}

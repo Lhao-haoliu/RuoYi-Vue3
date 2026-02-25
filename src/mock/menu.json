@@ -1,0 +1,8 @@
+{
+  "quickEntry": [
+    { "title": "任务明细", "path": "/report/task-list" },
+    { "title": "统计报表", "path": "/report/statistics" },
+    { "title": "任务启动", "path": "/commander/start" },
+    { "title": "公版图管理", "path": "/commander/public-map" }
+  ]
+}

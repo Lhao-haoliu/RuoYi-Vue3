@@ -1,5 +1,9 @@
 <template>
-   <div class="app-container">
+   <PageContainer class="system-management-page" title="Menu Management" description="Manage menus, routes, and permission identifiers.">
+      <template #actions>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:menu:add']">New Menu</el-button>
+      </template>
+      <template #search>
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
          <el-form-item label="菜单名称" prop="menuName">
             <el-input
@@ -25,6 +29,9 @@
             <el-button icon="Refresh" @click="resetQuery">重置</el-button>
          </el-form-item>
       </el-form>
+      </template>
+      <template #table>
+      <BaseTable>
 
       <el-row :gutter="10" class="mb8">
          <el-col :span="1.5">
@@ -82,6 +89,8 @@
             </template>
          </el-table-column>
       </el-table>
+      </BaseTable>
+      </template>
 
       <!-- 添加或修改菜单对话框 -->
       <el-dialog :title="title" v-model="open" width="680px" append-to-body>
@@ -285,10 +294,12 @@
             </div>
          </template>
       </el-dialog>
-   </div>
+   </PageContainer>
 </template>
 
 <script setup name="Menu">
+import PageContainer from "@/components/PageContainer"
+import BaseTable from "@/components/BaseTable"
 import { addMenu, delMenu, getMenu, listMenu, updateMenu } from "@/api/system/menu"
 import SvgIcon from "@/components/SvgIcon"
 import IconSelect from "@/components/IconSelect"

@@ -1,0 +1,54 @@
+:root {
+  --portal-primary-deep: #0f1f3d;
+  --portal-bg-main: #f7f9fc;
+  --portal-bg-card: #ffffff;
+  --portal-accent-a: #4a90e2;
+  --portal-accent-b: #6c5dd3;
+  --portal-text-main: #2e3a59;
+  --portal-text-sub: #5e6a84;
+  --portal-success: #27ae60;
+  --portal-warning: #f2c94c;
+  --portal-danger: #eb5757;
+  --portal-border: #e8edf6;
+}
+
+body {
+  color: var(--portal-text-main);
+  background: var(--portal-bg-main);
+}
+
+h1, h2, h3 {
+  font-weight: 600;
+}
+
+.portal-card {
+  background: var(--portal-bg-card);
+  border: 1px solid var(--portal-border);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(16, 31, 61, 0.05);
+}
+
+.portal-primary-btn.el-button {
+  border: none;
+  color: #fff;
+  background: linear-gradient(90deg, var(--portal-accent-a), var(--portal-accent-b));
+}
+
+.portal-primary-btn.el-button.is-disabled,
+.portal-primary-btn.el-button:disabled {
+  background: #cfd8ea;
+  color: #ffffff;
+}
+
+.portal-secondary-btn.el-button {
+  border: 1px solid #cbd7ec;
+  color: var(--portal-accent-a);
+  background: #fff;
+}
+
+.portal-secondary-btn.el-button.is-disabled,
+.portal-secondary-btn.el-button:disabled {
+  color: #9cadca;
+  border-color: #e0e8f7;
+}

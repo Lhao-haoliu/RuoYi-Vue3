@@ -1,5 +1,9 @@
 <template>
-   <div class="app-container">
+   <PageContainer class="system-management-page" title="Post Management" description="Manage post codes, status, and authorization scope.">
+      <template #actions>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:post:add']">New Post</el-button>
+      </template>
+      <template #search>
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
          <el-form-item label="岗位编码" prop="postCode">
             <el-input
@@ -34,6 +38,9 @@
             <el-button icon="Refresh" @click="resetQuery">重置</el-button>
          </el-form-item>
       </el-form>
+      </template>
+      <template #table>
+      <BaseTable>
 
       <el-row :gutter="10" class="mb8">
          <el-col :span="1.5">
@@ -108,6 +115,8 @@
          v-model:limit="queryParams.pageSize"
          @pagination="getList"
       />
+      </BaseTable>
+      </template>
 
       <!-- 添加或修改岗位对话框 -->
       <el-dialog :title="title" v-model="open" width="500px" append-to-body>
@@ -141,10 +150,12 @@
             </div>
          </template>
       </el-dialog>
-   </div>
+   </PageContainer>
 </template>
 
 <script setup name="Post">
+import PageContainer from "@/components/PageContainer"
+import BaseTable from "@/components/BaseTable"
 import { listPost, addPost, delPost, getPost, updatePost } from "@/api/system/post"
 
 const { proxy } = getCurrentInstance()

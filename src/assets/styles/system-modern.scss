@@ -1,0 +1,147 @@
+﻿.page-container {
+  background: #f7f9fc;
+  min-height: calc(100vh - 84px);
+  padding: 24px;
+}
+
+.page-container__header {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.page-container__title {
+  color: #2e3a59;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.page-container__desc {
+  color: #6b778c;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 6px 0 0;
+}
+
+.page-container__actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.page-container__search-card,
+.page-container__table-card {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 31, 61, 0.06);
+}
+
+.page-container__search-card {
+  margin-bottom: 16px;
+  padding: 18px 20px 4px;
+}
+
+.page-container__table-card {
+  padding: 18px 20px 22px;
+}
+
+.base-table__toolbar {
+  margin-bottom: 14px;
+}
+
+.base-table__pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+  padding-top: 8px;
+}
+
+.system-management-page {
+  .el-form {
+    --el-font-size-base: 14px;
+  }
+
+  .el-form--inline .el-form-item {
+    margin-bottom: 14px;
+    margin-right: 18px;
+  }
+
+  .el-form--inline .el-form-item:last-child {
+    margin-left: auto;
+    margin-right: 0;
+  }
+
+  .el-form-item__label {
+    color: #2e3a59;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .el-form-item__content {
+    .el-input,
+    .el-select,
+    .el-date-editor {
+      max-width: 260px;
+      width: 100%;
+    }
+  }
+
+  .el-table {
+    --el-table-row-height: 48px;
+    --el-table-header-bg-color: #f7f9fc;
+    --el-table-border-color: #eef1f7;
+    --el-table-border: none;
+    font-size: 14px;
+  }
+
+  .el-table td,
+  .el-table th {
+    border-bottom-color: #eef1f7;
+    padding: 12px 0;
+  }
+
+  .el-table__body tr:hover > td {
+    background-color: #f5f8ff !important;
+  }
+
+  .operation-text-btn + .operation-text-btn {
+    margin-left: 8px;
+  }
+
+  .pagination-container {
+    background: transparent !important;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 18px;
+    padding-top: 8px;
+  }
+
+  .toolbar-right {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .el-button--primary {
+    background: linear-gradient(90deg, #4a90e2 0%, #6c5dd3 100%);
+    border: none;
+    color: #fff;
+  }
+
+  .el-button--default,
+  .el-button--primary.is-plain,
+  .el-button--success.is-plain,
+  .el-button--warning.is-plain,
+  .el-button--info.is-plain {
+    border-color: #4a90e2;
+    color: #4a90e2;
+  }
+
+  .el-button--danger,
+  .el-button--danger.is-plain {
+    border-color: #eb5757;
+    color: #eb5757;
+  }
+}

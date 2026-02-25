@@ -1,6 +1,5 @@
 import { createWebHistory, createRouter } from 'vue-router'
-/* Layout */
-import Layout from '@/layout'
+import PortalLayout from '@/layout/portal-layout.vue'
 
 /**
  * Note: 路由配置项
@@ -28,7 +27,7 @@ import Layout from '@/layout'
 export const constantRoutes = [
   {
     path: '/redirect',
-    component: Layout,
+    component: PortalLayout,
     hidden: true,
     children: [
       {
@@ -59,7 +58,7 @@ export const constantRoutes = [
   },
   {
     path: '',
-    component: Layout,
+    component: PortalLayout,
     redirect: '/index',
     children: [
       {
@@ -72,7 +71,7 @@ export const constantRoutes = [
   },
   {
     path: '/user',
-    component: Layout,
+    component: PortalLayout,
     hidden: true,
     redirect: 'noredirect',
     children: [
@@ -90,7 +89,7 @@ export const constantRoutes = [
 export const dynamicRoutes = [
   {
     path: '/system/user-auth',
-    component: Layout,
+    component: PortalLayout,
     hidden: true,
     permissions: ['system:user:edit'],
     children: [
@@ -104,7 +103,7 @@ export const dynamicRoutes = [
   },
   {
     path: '/system/role-auth',
-    component: Layout,
+    component: PortalLayout,
     hidden: true,
     permissions: ['system:role:edit'],
     children: [
@@ -118,7 +117,7 @@ export const dynamicRoutes = [
   },
   {
     path: '/system/dict-data',
-    component: Layout,
+    component: PortalLayout,
     hidden: true,
     permissions: ['system:dict:list'],
     children: [
@@ -132,7 +131,7 @@ export const dynamicRoutes = [
   },
   {
     path: '/monitor/job-log',
-    component: Layout,
+    component: PortalLayout,
     hidden: true,
     permissions: ['monitor:job:list'],
     children: [
@@ -146,7 +145,7 @@ export const dynamicRoutes = [
   },
   {
     path: '/tool/gen-edit',
-    component: Layout,
+    component: PortalLayout,
     hidden: true,
     permissions: ['tool:gen:edit'],
     children: [

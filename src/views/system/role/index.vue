@@ -1,5 +1,9 @@
 <template>
-   <div class="app-container">
+   <PageContainer class="system-management-page" title="Role Management" description="Manage roles and permission assignments.">
+      <template #actions>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:role:add']">New Role</el-button>
+      </template>
+      <template #search>
       <el-form :model="queryParams" ref="queryRef" v-show="showSearch" :inline="true" label-width="68px">
          <el-form-item label="角色名称" prop="roleName">
             <el-input
@@ -49,6 +53,9 @@
             <el-button icon="Refresh" @click="resetQuery">重置</el-button>
          </el-form-item>
       </el-form>
+      </template>
+      <template #table>
+      <BaseTable>
       <el-row :gutter="10" class="mb8">
          <el-col :span="1.5">
             <el-button
@@ -113,20 +120,40 @@
                <span>{{ parseTime(scope.row.createTime) }}</span>
             </template>
          </el-table-column>
-         <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+         <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="260">
             <template #default="scope">
-              <el-tooltip content="修改" placement="top" v-if="scope.row.roleId !== 1">
-                <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:role:edit']"></el-button>
-              </el-tooltip>
-              <el-tooltip content="删除" placement="top" v-if="scope.row.roleId !== 1">
-                <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['system:role:remove']"></el-button>
-              </el-tooltip>
-              <el-tooltip content="数据权限" placement="top" v-if="scope.row.roleId !== 1">
-                <el-button link type="primary" icon="CircleCheck" @click="handleDataScope(scope.row)" v-hasPermi="['system:role:edit']"></el-button>
-              </el-tooltip>
-              <el-tooltip content="分配用户" placement="top" v-if="scope.row.roleId !== 1">
-                <el-button link type="primary" icon="User" @click="handleAuthUser(scope.row)" v-hasPermi="['system:role:edit']"></el-button>
-              </el-tooltip>
+               <el-button
+                  v-if="scope.row.roleId !== 1"
+                  link
+                  type="primary"
+                  class="operation-text-btn"
+                  @click="handleUpdate(scope.row)"
+                  v-hasPermi="['system:role:edit']"
+               >修改</el-button>
+               <el-button
+                  v-if="scope.row.roleId !== 1"
+                  link
+                  type="danger"
+                  class="operation-text-btn"
+                  @click="handleDelete(scope.row)"
+                  v-hasPermi="['system:role:remove']"
+               >删除</el-button>
+               <el-button
+                  v-if="scope.row.roleId !== 1"
+                  link
+                  type="primary"
+                  class="operation-text-btn"
+                  @click="handleDataScope(scope.row)"
+                  v-hasPermi="['system:role:edit']"
+               >数据权限</el-button>
+               <el-button
+                  v-if="scope.row.roleId !== 1"
+                  link
+                  type="primary"
+                  class="operation-text-btn"
+                  @click="handleAuthUser(scope.row)"
+                  v-hasPermi="['system:role:edit']"
+               >分配用户</el-button>
             </template>
          </el-table-column>
       </el-table>
@@ -138,6 +165,8 @@
          v-model:limit="queryParams.pageSize"
          @pagination="getList"
       />
+      </BaseTable>
+      </template>
 
       <!-- 添加或修改角色配置对话框 -->
       <el-dialog :title="title" v-model="open" width="500px" append-to-body>
@@ -238,10 +267,12 @@
             </div>
          </template>
       </el-dialog>
-   </div>
+   </PageContainer>
 </template>
 
 <script setup name="Role">
+import PageContainer from "@/components/PageContainer"
+import BaseTable from "@/components/BaseTable"
 import { addRole, changeRoleStatus, dataScope, delRole, getRole, listRole, updateRole, deptTreeSelect } from "@/api/system/role"
 import { roleMenuTreeselect, treeselect as menuTreeselect } from "@/api/system/menu"
 

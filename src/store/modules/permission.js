@@ -1,7 +1,7 @@
 import auth from '@/plugins/auth'
 import router, { constantRoutes, dynamicRoutes } from '@/router'
 import { getRouters } from '@/api/menu'
-import Layout from '@/layout/index'
+import PortalLayout from '@/layout/portal-layout.vue'
 import ParentView from '@/components/ParentView'
 import InnerLink from '@/layout/components/InnerLink'
 
@@ -64,7 +64,7 @@ function filterAsyncRouter(asyncRouterMap, lastRouter = false, type = false) {
     if (route.component) {
       // Layout ParentView 组件特殊处理
       if (route.component === 'Layout') {
-        route.component = Layout
+        route.component = PortalLayout
       } else if (route.component === 'ParentView') {
         route.component = ParentView
       } else if (route.component === 'InnerLink') {

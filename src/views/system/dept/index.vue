@@ -1,5 +1,9 @@
 <template>
-   <div class="app-container">
+   <PageContainer class="system-management-page" title="Department Management" description="Manage organization structure and department permissions.">
+      <template #actions>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:dept:add']">New Department</el-button>
+      </template>
+      <template #search>
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
          <el-form-item label="部门名称" prop="deptName">
             <el-input
@@ -25,6 +29,9 @@
             <el-button icon="Refresh" @click="resetQuery">重置</el-button>
          </el-form-item>
       </el-form>
+      </template>
+      <template #table>
+      <BaseTable>
 
       <el-row :gutter="10" class="mb8">
          <el-col :span="1.5">
@@ -75,6 +82,8 @@
             </template>
          </el-table-column>
       </el-table>
+      </BaseTable>
+      </template>
 
       <!-- 添加或修改部门对话框 -->
       <el-dialog :title="title" v-model="open" width="600px" append-to-body>
@@ -137,10 +146,12 @@
             </div>
          </template>
       </el-dialog>
-   </div>
+   </PageContainer>
 </template>
 
 <script setup name="Dept">
+import PageContainer from "@/components/PageContainer"
+import BaseTable from "@/components/BaseTable"
 import { listDept, getDept, delDept, addDept, updateDept, listDeptExcludeChild } from "@/api/system/dept"
 
 const { proxy } = getCurrentInstance()
