@@ -15,14 +15,20 @@
     </section>
 
     <section class="page-container__table-card">
-      <slot name="table">
-        <slot />
-      </slot>
+      <slot v-if="hasTableSlot" name="table" />
+      <slot v-else />
     </section>
+
+    <slot v-if="hasTableSlot" />
   </section>
 </template>
 
 <script setup>
+import { computed, useSlots } from "vue"
+
+const slots = useSlots()
+const hasTableSlot = computed(() => Boolean(slots.table))
+
 defineProps({
   title: {
     type: String,

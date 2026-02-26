@@ -108,6 +108,7 @@ const showSearch = ref(true)
 const multiple = ref(true)
 const total = ref(0)
 const userIds = ref([])
+const selectRef = ref()
 
 const queryParams = reactive({
   pageNum: 1,
@@ -153,7 +154,7 @@ function handleSelectionChange(selection) {
 
 /** 打开授权用户表弹窗 */
 function openSelectUser() {
-  proxy.$refs["selectRef"].show()
+  selectRef.value?.show()
 }
 
 /** 取消授权按钮操作 */

@@ -1,0 +1,294 @@
+{
+  "generatedAt": "2026-02-26T01:45:53.221Z",
+  "runtimeErrors": [],
+  "report": [
+    {
+      "page": "用户管理",
+      "action": "搜索",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "用户管理",
+      "action": "重置",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "用户管理",
+      "action": "新建用户",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "用户管理",
+      "action": "工具栏修改",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "用户管理",
+      "action": "工具栏删除",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "用户管理",
+      "action": "工具栏导出",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "用户管理",
+      "action": "工具栏导入",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "用户管理",
+      "action": "首行编辑",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "用户管理",
+      "action": "更多-重置密码",
+      "status": "SKIP",
+      "detail": "无权限或按钮不存在"
+    },
+    {
+      "page": "角色管理",
+      "action": "搜索",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "角色管理",
+      "action": "重置",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "角色管理",
+      "action": "新建角色",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "角色管理",
+      "action": "工具栏修改",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "角色管理",
+      "action": "工具栏删除",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "角色管理",
+      "action": "工具栏导出",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "角色管理",
+      "action": "首行编辑",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "角色管理",
+      "action": "首行数据权限",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "角色管理",
+      "action": "首行分配用户",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "角色分配用户",
+      "action": "搜索",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "角色分配用户",
+      "action": "重置",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "角色分配用户",
+      "action": "添加用户",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "角色分配用户",
+      "action": "关闭",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "菜单管理",
+      "action": "搜索",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "菜单管理",
+      "action": "重置",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "菜单管理",
+      "action": "新建菜单",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "菜单管理",
+      "action": "首行编辑",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "字典管理",
+      "action": "搜索",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "字典管理",
+      "action": "重置",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "字典管理",
+      "action": "新建字典",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "字典管理",
+      "action": "工具栏修改",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "字典管理",
+      "action": "工具栏删除",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "字典管理",
+      "action": "工具栏导出",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "字典管理",
+      "action": "首行编辑",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "参数管理",
+      "action": "搜索",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "参数管理",
+      "action": "重置",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "参数管理",
+      "action": "新建参数",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "参数管理",
+      "action": "工具栏修改",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "参数管理",
+      "action": "工具栏删除",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "参数管理",
+      "action": "工具栏导出",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "参数管理",
+      "action": "刷新缓存",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "参数管理",
+      "action": "首行编辑",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "通知公告",
+      "action": "搜索",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "通知公告",
+      "action": "重置",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "通知公告",
+      "action": "新建公告",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "通知公告",
+      "action": "工具栏修改",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "通知公告",
+      "action": "工具栏删除",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "page": "通知公告",
+      "action": "工具栏导出",
+      "status": "SKIP",
+      "detail": "按钮不存在或无权限"
+    },
+    {
+      "page": "通知公告",
+      "action": "首行编辑",
+      "status": "PASS",
+      "detail": ""
+    }
+  ]
+}
