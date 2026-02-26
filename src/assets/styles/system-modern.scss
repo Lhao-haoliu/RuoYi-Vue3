@@ -124,10 +124,29 @@
     justify-content: flex-end;
   }
 
-  .el-button--primary {
+  .el-button--primary:not(.is-link):not(.is-text):not(.is-plain) {
     background: linear-gradient(90deg, #4a90e2 0%, #6c5dd3 100%);
     border: none;
     color: #fff;
+  }
+
+  .el-button--primary:not(.is-link):not(.is-text):not(.is-plain).is-disabled,
+  .el-button--primary:not(.is-link):not(.is-text):not(.is-plain):disabled {
+    color: #ffffff;
+    opacity: 0.65;
+  }
+
+  .el-button.is-link.el-button--primary,
+  .el-button.is-link.el-button--info {
+    background: transparent;
+    border: none;
+    color: #4a90e2;
+  }
+
+  .el-button.is-link.el-button--danger {
+    background: transparent;
+    border: none;
+    color: #eb5757;
   }
 
   .el-button--default,

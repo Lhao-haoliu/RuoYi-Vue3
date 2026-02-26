@@ -1,10 +1,10 @@
-<template>
+﻿<template>
   <div class="portal-login">
     <div class="login-panel">
       <div class="login-brand">
         <img :src="portalLogo" alt="Portal" />
         <h2>{{ title }}</h2>
-        <p>Enterprise Intelligence Platform</p>
+        <p>企业智能平台</p>
       </div>
       <el-form ref="loginRef" :model="loginForm" :rules="loginRules" class="login-form">
         <el-form-item prop="username">
@@ -197,3 +197,4 @@ getCookie()
   width: 100%;
 }
 </style>
+

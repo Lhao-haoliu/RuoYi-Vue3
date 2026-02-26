@@ -1,7 +1,7 @@
 <template>
-   <PageContainer class="system-management-page" title="Config Management" description="Manage runtime parameters and configuration items.">
+   <PageContainer class="system-management-page" title="参数配置" description="管理系统运行参数与配置项。">
       <template #actions>
-         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:config:add']">New Config</el-button>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:config:add']">新建参数</el-button>
       </template>
       <template #search>
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">

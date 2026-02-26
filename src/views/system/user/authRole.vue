@@ -1,5 +1,5 @@
 <template>
-   <PageContainer class="system-management-page" title="User Role Authorization" description="Configure role assignments for the selected user.">
+   <PageContainer class="system-management-page" title="用户角色授权" description="为当前用户配置角色分配。">
       <template #actions>
          <el-button type="primary" @click="submitForm()">提交</el-button>
          <el-button @click="close()">返回</el-button>

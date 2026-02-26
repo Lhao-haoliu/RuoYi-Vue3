@@ -1,7 +1,7 @@
 <template>
-   <PageContainer class="system-management-page" title="Menu Management" description="Manage menus, routes, and permission identifiers.">
+   <PageContainer class="system-management-page" title="菜单管理" description="管理菜单、路由与权限标识。">
       <template #actions>
-         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:menu:add']">New Menu</el-button>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:menu:add']">新建菜单</el-button>
       </template>
       <template #search>
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
@@ -155,7 +155,7 @@
                   <el-form-item prop="routeName">
                      <template #label>
                         <span>
-                           <el-tooltip content="默认不填则和路由地址相同：如地址为：`user`，则名称为`User`（注意：因为router会删除名称相同路由，为避免名字的冲突，特殊情况下请自定义，保证唯一性）" placement="top">
+                           <el-tooltip content="默认不填则和路由地址相同：如地址为：`user`，则名称为`用户`（注意：因为router会删除名称相同路由，为避免名字的冲突，特殊情况下请自定义，保证唯一性）" placement="top">
                               <el-icon><question-filled /></el-icon>
                            </el-tooltip>
                            路由名称

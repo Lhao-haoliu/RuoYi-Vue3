@@ -1,7 +1,7 @@
 <template>
-   <PageContainer class="system-management-page" title="Role Management" description="Manage roles and permission assignments.">
+   <PageContainer class="system-management-page" title="角色管理" description="管理系统角色与权限分配。">
       <template #actions>
-         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:role:add']">New Role</el-button>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:role:add']">新建角色</el-button>
       </template>
       <template #search>
       <el-form :model="queryParams" ref="queryRef" v-show="showSearch" :inline="true" label-width="68px">

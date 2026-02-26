@@ -1,6 +1,6 @@
 
 <template>
-   <PageContainer class="system-management-page" title="Role User Authorization" description="Manage authorized users for the current role.">
+   <PageContainer class="system-management-page" title="角色用户授权" description="管理当前角色已授权用户。">
       <template #actions>
          <el-button type="primary" icon="Plus" @click="openSelectUser" v-hasPermi="['system:role:add']">添加用户</el-button>
       </template>

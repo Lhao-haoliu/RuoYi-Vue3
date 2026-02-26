@@ -1,7 +1,7 @@
 <template>
-   <PageContainer class="system-management-page" title="Department Management" description="Manage organization structure and department permissions.">
+   <PageContainer class="system-management-page" title="部门管理" description="管理组织架构与部门权限。">
       <template #actions>
-         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:dept:add']">New Department</el-button>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:dept:add']">新建部门</el-button>
       </template>
       <template #search>
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">

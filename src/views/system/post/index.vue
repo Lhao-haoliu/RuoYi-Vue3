@@ -1,7 +1,7 @@
 <template>
-   <PageContainer class="system-management-page" title="Post Management" description="Manage post codes, status, and authorization scope.">
+   <PageContainer class="system-management-page" title="岗位管理" description="管理岗位编码、状态与授权范围。">
       <template #actions>
-         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:post:add']">New Post</el-button>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:post:add']">新建岗位</el-button>
       </template>
       <template #search>
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">

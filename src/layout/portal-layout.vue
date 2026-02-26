@@ -1,11 +1,11 @@
-<template>
+﻿<template>
   <div class="portal-shell">
     <aside class="portal-sidebar">
       <div class="portal-brand">
         <img :src="portalLogo" alt="Portal" />
         <div class="portal-brand-text">
-          <h1>PORTAL</h1>
-          <p>Enterprise Console</p>
+          <h1>系统门户</h1>
+          <p>企业控制台</p>
         </div>
       </div>
       <el-scrollbar class="portal-menu-scroll">
@@ -45,7 +45,7 @@
           <el-dropdown>
             <div class="portal-user">
               <el-avatar :src="userStore.avatar || undefined" :size="34" />
-              <span>{{ userStore.nickName || userStore.name || "User" }}</span>
+              <span>{{ userStore.nickName || userStore.name || "用户" }}</span>
             </div>
             <template #dropdown>
               <el-dropdown-menu>
@@ -241,3 +241,4 @@ onBeforeUnmount(() => {
   }
 }
 </style>
+

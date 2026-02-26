@@ -1,7 +1,7 @@
 <template>
-   <PageContainer class="system-management-page" title="Dictionary Management" description="Manage dictionary types and business enumerations.">
+   <PageContainer class="system-management-page" title="字典管理" description="管理字典类型与业务枚举。">
       <template #actions>
-         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:dict:add']">New Dictionary</el-button>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:dict:add']">新建字典</el-button>
       </template>
       <template #search>
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">

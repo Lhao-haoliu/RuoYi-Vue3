@@ -1,7 +1,7 @@
 <template>
-   <PageContainer class="system-management-page" title="Notice Management" description="Publish and maintain system notices.">
+   <PageContainer class="system-management-page" title="通知公告" description="发布并维护系统通知公告。">
       <template #actions>
-         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:notice:add']">New Notice</el-button>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:notice:add']">新建公告</el-button>
       </template>
       <template #search>
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">

@@ -1,7 +1,7 @@
 <template>
-   <PageContainer class="system-management-page" title="Dictionary Data" description="Maintain dictionary item data and status.">
+   <PageContainer class="system-management-page" title="字典数据" description="维护字典数据项与状态。">
       <template #actions>
-         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:dict:add']">New Item</el-button>
+         <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['system:dict:add']">新建数据项</el-button>
       </template>
       <template #search>
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
