@@ -85,22 +85,28 @@
                     @click="handleCellSelection(cell, $event)"
                   >
                     <template v-if="hasValidationOptions(cell)">
-                      <input
+                      <select
                         v-model="cell.value"
                         class="cell-input cell-select"
                         :class="{ dirty: cell.dirty, formula: cell.formula }"
                         :style="buildCellInputStyle(cell)"
-                        :list="buildCellDatalistId(cell)"
-                        spellcheck="false"
-                        @input="handleCellInput(cell)"
-                      />
-                      <datalist :id="buildCellDatalistId(cell)">
+                        @change="handleCellInput(cell)"
+                      >
+                        <option v-if="cell.validationAllowBlank" value=""></option>
+                        <option
+                          v-if="shouldKeepCurrentValidationValue(cell)"
+                          :value="cell.value"
+                        >
+                          {{ cell.value }}
+                        </option>
                         <option
                           v-for="option in cell.validationOptions"
                           :key="`list-${cell.rowIndex}-${cell.colIndex}-${option}`"
                           :value="option"
-                        />
-                      </datalist>
+                        >
+                          {{ option }}
+                        </option>
+                      </select>
                     </template>
                     <textarea
                       v-else
@@ -108,6 +114,7 @@
                       class="cell-input"
                       :class="{ dirty: cell.dirty, formula: cell.formula }"
                       :style="buildCellInputStyle(cell)"
+                      :maxlength="MAX_CELL_TEXT_LENGTH"
                       :wrap="cell.style?.whiteSpace === 'pre-wrap' ? 'soft' : 'off'"
                       spellcheck="false"
                       @input="handleCellInput(cell)"
@@ -149,6 +156,7 @@ const DEFAULT_COLUMN_WIDTH = 96
 const MIN_COLUMN_WIDTH = 72
 const DEFAULT_CELL_HEIGHT = 32
 const ROW_INDEX_WIDTH = 56
+const MAX_CELL_TEXT_LENGTH = 32767
 
 const route = useRoute()
 const router = useRouter()
@@ -164,6 +172,7 @@ const isDirty = ref(false)
 const dirtyCount = ref(0)
 const revertingRoute = ref(false)
 const selection = ref(null)
+const showedCellLimitHint = ref(false)
 
 const currentSheet = computed(() => sheets.value.find((sheet) => sheet.name === activeSheetName.value) || null)
 const hasWorkbook = computed(() => sheets.value.length > 0)
@@ -366,6 +375,7 @@ function normalizeCell(cell) {
     dirty: false,
     forceDirty: false,
     validationOptions: [],
+    validationAllowBlank: true,
     style: typeof cell?.style === 'object' && cell.style ? { ...cell.style } : {}
   }
 }
@@ -449,6 +459,14 @@ function clearSelection() {
 }
 
 function handleCellInput(cell) {
+  const normalized = normalizeValue(cell.value)
+  if (normalized.length > MAX_CELL_TEXT_LENGTH) {
+    cell.value = normalized.slice(0, MAX_CELL_TEXT_LENGTH)
+    if (!showedCellLimitHint.value) {
+      ElMessage.warning(`单元格内容已超过 Excel 限制，已截断到 ${MAX_CELL_TEXT_LENGTH} 字符`)
+      showedCellLimitHint.value = true
+    }
+  }
   cell.dirty = cell.forceDirty || normalizeValue(cell.value) !== normalizeValue(cell.originalValue)
   refreshDirtyState()
 }
@@ -1101,7 +1119,9 @@ function syncCellDimensions(sheet, cell) {
   ensureSheetBounds(sheet, cell.rowIndex + cell.rowSpan, cell.colIndex + cell.colSpan)
   cell.widthPx = resolveRangeWidth(sheet, cell.colIndex, cell.colSpan)
   cell.heightPx = resolveRangeHeight(sheet, cell.rowIndex, cell.rowSpan)
-  cell.validationOptions = resolveCellValidationOptions(sheet, cell.rowIndex, cell.colIndex)
+  const validation = resolveCellValidationOptions(sheet, cell.rowIndex, cell.colIndex)
+  cell.validationOptions = validation.options
+  cell.validationAllowBlank = validation.allowBlank
 }
 
 function resolveCellValidationOptions(sheet, rowIndex, colIndex) {
@@ -1113,9 +1133,22 @@ function resolveCellValidationOptions(sheet, rowIndex, colIndex) {
     if (colIndex < validation.firstColumn || colIndex > validation.lastColumn) {
       continue
     }
-    return Array.isArray(validation.options) ? validation.options : []
+    return {
+      options: Array.isArray(validation.options) ? validation.options : [],
+      allowBlank: validation.allowBlank !== false
+    }
   }
-  return []
+  return {
+    options: [],
+    allowBlank: true
+  }
+}
+
+function shouldKeepCurrentValidationValue(cell) {
+  if (!cell || !normalizeValue(cell.value)) {
+    return false
+  }
+  return !cell.validationOptions.includes(cell.value)
 }
 
 function dedupeCells(cells) {
