@@ -3,9 +3,9 @@
     <section class="hero-card">
       <div>
         <p class="eyebrow">Format Preserving Editor</p>
-        <h1>在线Excel编辑</h1>
+        <h1>在线 Excel 编辑</h1>
         <p class="hero-desc">
-          当前版本会基于后端原始工作簿直接改单元格值，尽量保留合并单元格、底色、字体、列宽、行高等原始格式。
+          当前版本会基于后端原始工作簿直接修改单元格内容，并尽量保留合并单元格、底色、字体、列宽、行高等原始格式。
         </p>
       </div>
       <div class="hero-actions">
@@ -30,7 +30,7 @@
       <article class="summary-card">
         <span class="summary-label">保存状态</span>
         <strong>{{ isDirty ? `有 ${dirtyCount} 处未保存修改` : '已同步' }}</strong>
-        <span>{{ isDirty ? '保存时会只提交改动过的单元格' : '当前内容与后端文件一致' }}</span>
+        <span>{{ isDirty ? '保存时会提交改动单元格和合并布局' : '当前内容与服务器文件一致' }}</span>
       </article>
     </section>
 
@@ -40,6 +40,11 @@
           <div class="toolbar-left">
             <el-tag type="info" effect="light">编辑文件：{{ currentFileName }}</el-tag>
             <el-tag :type="isDirty ? 'warning' : 'success'" effect="light">{{ isDirty ? '未保存' : '已保存' }}</el-tag>
+          </div>
+          <div class="toolbar-right">
+            <span class="selection-tip">{{ selectionLabel }}</span>
+            <el-button size="small" :disabled="!canMergeSelection" @click="mergeSelectedCells">合并单元格</el-button>
+            <el-button size="small" :disabled="!canUnmergeSelection" @click="unmergeSelectedCells">取消合并</el-button>
           </div>
         </div>
 
@@ -52,30 +57,77 @@
           />
         </el-tabs>
 
-        <div class="grid-wrap">
-          <table class="sheet-grid">
-            <tbody>
-              <tr v-for="row in currentSheet.rows" :key="`row-${row.rowIndex}`">
-                <td class="row-index" :style="{ height: `${row.heightPx}px` }">{{ row.rowIndex + 1 }}</td>
-                <td
-                  v-for="cell in row.cells"
-                  :key="`cell-${row.rowIndex}-${cell.colIndex}`"
-                  :colspan="cell.colSpan"
-                  :rowspan="cell.rowSpan"
-                  :style="buildCellTdStyle(cell)"
-                >
-                  <textarea
-                    v-model="cell.value"
-                    class="cell-input"
-                    :class="{ dirty: cell.dirty, formula: cell.formula }"
-                    :style="buildCellInputStyle(cell)"
-                    spellcheck="false"
-                    @input="handleCellInput(cell)"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-if="currentSheet" class="grid-wrap">
+          <div class="sheet-stage" :style="buildSheetStageStyle(currentSheet)">
+            <div v-if="hasBackgroundImages(currentSheet)" class="sheet-image-layer sheet-image-layer-background">
+              <div
+                v-for="(image, imageIndex) in listBackgroundImages(currentSheet)"
+                :key="buildImageKey(image, imageIndex)"
+                class="sheet-image-item background"
+                :style="buildImageStyle(image)"
+              >
+                <img class="sheet-image" :src="image.src" :alt="image.description || 'background image'" draggable="false" />
+              </div>
+            </div>
+
+            <table class="sheet-grid">
+              <tbody>
+                <tr v-for="row in currentSheet.rows" :key="`row-${row.rowIndex}`">
+                  <td class="row-index" :style="buildRowIndexStyle(row)">{{ row.rowIndex + 1 }}</td>
+                  <td
+                    v-for="cell in row.cells"
+                    :key="`cell-${row.rowIndex}-${cell.colIndex}`"
+                    class="sheet-cell"
+                    :class="buildCellClass(cell)"
+                    :colspan="cell.colSpan"
+                    :rowspan="cell.rowSpan"
+                    :style="buildCellTdStyle(cell)"
+                    @click="handleCellSelection(cell, $event)"
+                  >
+                    <template v-if="hasValidationOptions(cell)">
+                      <input
+                        v-model="cell.value"
+                        class="cell-input cell-select"
+                        :class="{ dirty: cell.dirty, formula: cell.formula }"
+                        :style="buildCellInputStyle(cell)"
+                        :list="buildCellDatalistId(cell)"
+                        spellcheck="false"
+                        @input="handleCellInput(cell)"
+                      />
+                      <datalist :id="buildCellDatalistId(cell)">
+                        <option
+                          v-for="option in cell.validationOptions"
+                          :key="`list-${cell.rowIndex}-${cell.colIndex}-${option}`"
+                          :value="option"
+                        />
+                      </datalist>
+                    </template>
+                    <textarea
+                      v-else
+                      v-model="cell.value"
+                      class="cell-input"
+                      :class="{ dirty: cell.dirty, formula: cell.formula }"
+                      :style="buildCellInputStyle(cell)"
+                      :wrap="cell.style?.whiteSpace === 'pre-wrap' ? 'soft' : 'off'"
+                      spellcheck="false"
+                      @input="handleCellInput(cell)"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div v-if="hasAnchoredImages(currentSheet)" class="sheet-image-layer sheet-image-layer-foreground">
+              <div
+                v-for="(image, imageIndex) in listAnchoredImages(currentSheet)"
+                :key="buildImageKey(image, imageIndex)"
+                class="sheet-image-item anchored"
+                :style="buildImageStyle(image)"
+              >
+                <img class="sheet-image" :src="image.src" :alt="image.description || 'embedded image'" draggable="false" />
+              </div>
+            </div>
+          </div>
         </div>
       </template>
 
@@ -91,6 +143,13 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { saveAs } from 'file-saver'
 import { applyExcelWorkbookChanges, getExcelEditorContent, getExcelEditorInfo, getExcelWorkbookView } from '@/api/tool/excelEditor'
 
+const DEFAULT_ROW_HEIGHT = 28
+const MIN_ROW_HEIGHT = 24
+const DEFAULT_COLUMN_WIDTH = 96
+const MIN_COLUMN_WIDTH = 72
+const DEFAULT_CELL_HEIGHT = 32
+const ROW_INDEX_WIDTH = 56
+
 const route = useRoute()
 const router = useRouter()
 
@@ -104,9 +163,34 @@ const saving = ref(false)
 const isDirty = ref(false)
 const dirtyCount = ref(0)
 const revertingRoute = ref(false)
+const selection = ref(null)
 
 const currentSheet = computed(() => sheets.value.find((sheet) => sheet.name === activeSheetName.value) || null)
 const hasWorkbook = computed(() => sheets.value.length > 0)
+const activeSelection = computed(() => {
+  if (!selection.value || selection.value.sheetName !== activeSheetName.value) {
+    return null
+  }
+  return selection.value
+})
+const selectionLabel = computed(() => {
+  if (!activeSelection.value) {
+    return '点击单元格选择，Shift + 点击扩展选区'
+  }
+  return `选区 ${formatSelectionRange(activeSelection.value)}`
+})
+const canMergeSelection = computed(() => {
+  if (!currentSheet.value || !activeSelection.value) {
+    return false
+  }
+  return getSelectionArea(activeSelection.value) > 1
+})
+const canUnmergeSelection = computed(() => {
+  if (!currentSheet.value || !activeSelection.value) {
+    return false
+  }
+  return currentSheet.value.cells.some((cell) => isMergedCell(cell) && rangesIntersect(activeSelection.value, getCellRange(cell)))
+})
 
 onMounted(async () => {
   await initializeFromRoute()
@@ -135,6 +219,10 @@ watch(
   }
 )
 
+watch(activeSheetName, () => {
+  clearSelection()
+})
+
 async function initializeFromRoute() {
   const fileName = normalizeQueryFileName(route.query.fileName)
   if (fileName) {
@@ -160,7 +248,7 @@ async function confirmReplaceWorkbook() {
     return true
   }
   try {
-    await ElMessageBox.confirm('当前有未保存修改，继续操作会丢失这些改动，是否继续？', '确认切换', {
+    await ElMessageBox.confirm('当前有未保存修改，继续切换会丢失这些改动，是否继续？', '确认切换', {
       type: 'warning',
       confirmButtonText: '继续',
       cancelButtonText: '取消'
@@ -202,40 +290,147 @@ function applyWorkbookView(data) {
   activeSheetName.value = nextSheets[0]?.name || ''
   currentFileName.value = data?.currentFileName || data?.fileName || ''
   workbookName.value = data?.fileName || currentFileName.value || '未加载'
-  isDirty.value = false
-  dirtyCount.value = 0
+  clearSelection()
+  refreshDirtyState()
 }
 
 function normalizeSheet(sheet) {
-  return {
-    name: sheet?.name || `Sheet${Math.random().toString(36).slice(2, 6)}`,
-    rows: Array.isArray(sheet?.rows) ? sheet.rows.map(normalizeRow) : []
-  }
-}
+  const name = sheet?.name || `Sheet${Math.random().toString(36).slice(2, 6)}`
+  const rowHeights = []
+  const columnWidths = []
+  const cells = []
+  const images = normalizeImages(sheet?.images)
+  const validations = normalizeValidations(sheet?.validations)
+  const freezePane = normalizeFreezePane(sheet?.freezePane)
+  let rowCount = Math.max(Number(sheet?.rowCount ?? 0), 1)
+  let maxColumnCount = Math.max(Number(sheet?.maxColumnCount ?? 0), 1)
+  const sourceRows = Array.isArray(sheet?.rows) ? sheet.rows : []
 
-function normalizeRow(row) {
-  return {
-    rowIndex: Number(row?.rowIndex ?? 0),
-    heightPx: Number(row?.heightPx ?? 28),
-    cells: Array.isArray(row?.cells) ? row.cells.map(normalizeCell) : []
+  for (const sourceRow of sourceRows) {
+    const rowIndex = Math.max(Number(sourceRow?.rowIndex ?? 0), 0)
+    rowCount = Math.max(rowCount, rowIndex + 1)
+    ensureArraySize(rowHeights, rowIndex + 1, DEFAULT_ROW_HEIGHT)
+    rowHeights[rowIndex] = normalizeRowHeight(sourceRow?.heightPx)
+
+    const sourceCells = Array.isArray(sourceRow?.cells) ? sourceRow.cells : []
+    for (const sourceCell of sourceCells) {
+      const cell = normalizeCell(sourceCell)
+      cells.push(cell)
+      rowCount = Math.max(rowCount, cell.rowIndex + cell.rowSpan)
+      maxColumnCount = Math.max(maxColumnCount, cell.colIndex + cell.colSpan)
+      ensureArraySize(columnWidths, cell.colIndex + cell.colSpan, null)
+      applyColumnWidthHint(columnWidths, cell)
+    }
   }
+
+  ensureArraySize(rowHeights, rowCount, DEFAULT_ROW_HEIGHT)
+  ensureArraySize(columnWidths, maxColumnCount, null)
+  for (let index = 0; index < columnWidths.length; index += 1) {
+    if (columnWidths[index] == null) {
+      columnWidths[index] = DEFAULT_COLUMN_WIDTH
+    }
+  }
+
+  const normalized = {
+    name,
+    rowCount,
+    maxColumnCount,
+    rowHeights,
+    columnWidths,
+    freezePane,
+    validations,
+    images,
+    cells: dedupeCells(cells),
+    rows: [],
+    originalMergeKeys: []
+  }
+
+  rebuildSheetRows(normalized)
+  normalized.originalMergeKeys = collectSheetMergeKeys(normalized)
+  return normalized
 }
 
 function normalizeCell(cell) {
   const value = cell?.value == null ? '' : String(cell.value)
   return {
-    rowIndex: Number(cell?.rowIndex ?? 0),
-    colIndex: Number(cell?.colIndex ?? 0),
+    rowIndex: Math.max(Number(cell?.rowIndex ?? 0), 0),
+    colIndex: Math.max(Number(cell?.colIndex ?? 0), 0),
     rowSpan: Math.max(Number(cell?.rowSpan ?? 1), 1),
     colSpan: Math.max(Number(cell?.colSpan ?? 1), 1),
-    widthPx: Math.max(Number(cell?.widthPx ?? 96), 72),
-    heightPx: Math.max(Number(cell?.heightPx ?? 32), 24),
+    widthPx: Math.max(Number(cell?.widthPx ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH),
+    heightPx: Math.max(Number(cell?.heightPx ?? DEFAULT_CELL_HEIGHT), MIN_ROW_HEIGHT),
     value,
     originalValue: value,
     displayValue: cell?.displayValue == null ? '' : String(cell.displayValue),
     formula: Boolean(cell?.formula),
     dirty: false,
+    forceDirty: false,
+    validationOptions: [],
     style: typeof cell?.style === 'object' && cell.style ? { ...cell.style } : {}
+  }
+}
+
+function normalizeFreezePane(freezePane) {
+  return {
+    xSplit: Math.max(Number(freezePane?.xSplit ?? 0), 0),
+    ySplit: Math.max(Number(freezePane?.ySplit ?? 0), 0),
+    leftColumn: Math.max(Number(freezePane?.leftColumn ?? 0), 0),
+    topRow: Math.max(Number(freezePane?.topRow ?? 0), 0)
+  }
+}
+
+function normalizeValidations(validations) {
+  const source = Array.isArray(validations) ? validations : []
+  return source
+    .map((item) => ({
+      firstRow: Math.max(Number(item?.firstRow ?? 0), 0),
+      lastRow: Math.max(Number(item?.lastRow ?? 0), 0),
+      firstColumn: Math.max(Number(item?.firstColumn ?? 0), 0),
+      lastColumn: Math.max(Number(item?.lastColumn ?? 0), 0),
+      allowBlank: item?.allowBlank !== false,
+      options: Array.isArray(item?.options) ? item.options.map((option) => String(option)) : []
+    }))
+    .filter((item) => item.options.length > 0)
+}
+
+function normalizeImages(images) {
+  const source = Array.isArray(images) ? images : []
+  return source
+    .map((item) => ({
+      kind: item?.kind === 'background' ? 'background' : 'anchored',
+      row1: Math.max(Number(item?.row1 ?? 0), 0),
+      col1: Math.max(Number(item?.col1 ?? 0), 0),
+      row2: Math.max(Number(item?.row2 ?? 0), 0),
+      col2: Math.max(Number(item?.col2 ?? 0), 0),
+      dx1Px: Math.max(Number(item?.dx1Px ?? 0), 0),
+      dx2Px: Math.max(Number(item?.dx2Px ?? 0), 0),
+      dy1Px: Math.max(Number(item?.dy1Px ?? 0), 0),
+      dy2Px: Math.max(Number(item?.dy2Px ?? 0), 0),
+      widthPx: Math.max(Number(item?.widthPx ?? 0), 1),
+      heightPx: Math.max(Number(item?.heightPx ?? 0), 1),
+      src: item?.src ? String(item.src) : '',
+      mimeType: item?.mimeType ? String(item.mimeType) : '',
+      extension: item?.extension ? String(item.extension) : '',
+      description: item?.description ? String(item.description) : ''
+    }))
+    .filter((item) => item.src)
+}
+
+function normalizeRowHeight(value) {
+  return Math.max(Number(value ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+}
+
+function applyColumnWidthHint(columnWidths, cell) {
+  if (cell.colSpan === 1) {
+    columnWidths[cell.colIndex] = cell.widthPx
+    return
+  }
+  const fallbackWidth = Math.max(Math.round(cell.widthPx / cell.colSpan), MIN_COLUMN_WIDTH)
+  for (let offset = 0; offset < cell.colSpan; offset += 1) {
+    const columnIndex = cell.colIndex + offset
+    if (columnWidths[columnIndex] == null) {
+      columnWidths[columnIndex] = fallbackWidth
+    }
   }
 }
 
@@ -244,48 +439,320 @@ function clearWorkbook() {
   sheets.value = []
   activeSheetName.value = ''
   currentFileName.value = ''
+  clearSelection()
   isDirty.value = false
   dirtyCount.value = 0
 }
 
+function clearSelection() {
+  selection.value = null
+}
+
 function handleCellInput(cell) {
-  cell.dirty = normalizeValue(cell.value) !== normalizeValue(cell.originalValue)
+  cell.dirty = cell.forceDirty || normalizeValue(cell.value) !== normalizeValue(cell.originalValue)
   refreshDirtyState()
 }
 
+function handleCellSelection(cell, event) {
+  if (!currentSheet.value) {
+    return
+  }
+  const cellRange = getCellRange(cell)
+  if (event?.shiftKey && activeSelection.value) {
+    const anchor = activeSelection.value
+    selection.value = {
+      sheetName: currentSheet.value.name,
+      anchorStartRow: anchor.anchorStartRow,
+      anchorEndRow: anchor.anchorEndRow,
+      anchorStartCol: anchor.anchorStartCol,
+      anchorEndCol: anchor.anchorEndCol,
+      startRow: Math.min(anchor.anchorStartRow, cellRange.startRow),
+      endRow: Math.max(anchor.anchorEndRow, cellRange.endRow),
+      startCol: Math.min(anchor.anchorStartCol, cellRange.startCol),
+      endCol: Math.max(anchor.anchorEndCol, cellRange.endCol)
+    }
+    return
+  }
+  selection.value = {
+    sheetName: currentSheet.value.name,
+    anchorStartRow: cellRange.startRow,
+    anchorEndRow: cellRange.endRow,
+    anchorStartCol: cellRange.startCol,
+    anchorEndCol: cellRange.endCol,
+    startRow: cellRange.startRow,
+    endRow: cellRange.endRow,
+    startCol: cellRange.startCol,
+    endCol: cellRange.endCol
+  }
+}
+
+function isCellSelected(cell) {
+  if (!activeSelection.value) {
+    return false
+  }
+  return rangesIntersect(activeSelection.value, getCellRange(cell))
+}
+
+async function mergeSelectedCells() {
+  const sheet = currentSheet.value
+  const range = activeSelection.value
+  if (!sheet || !range) {
+    ElMessage.warning('请先选择要合并的单元格')
+    return
+  }
+  if (getSelectionArea(range) < 2) {
+    ElMessage.info('至少选择两个单元格后才能合并')
+    return
+  }
+
+  const cellsToClear = sheet.cells.filter((cell) => {
+    if (!isCellTopLeftInsideRange(cell, range)) {
+      return false
+    }
+    if (cell.rowIndex === range.startRow && cell.colIndex === range.startCol) {
+      return false
+    }
+    return normalizeValue(cell.value) !== ''
+  })
+  if (cellsToClear.length) {
+    try {
+      await ElMessageBox.confirm('合并后仅保留左上角内容，其余内容会被清空，是否继续？', '确认合并', {
+        type: 'warning',
+        confirmButtonText: '继续合并',
+        cancelButtonText: '取消'
+      })
+    } catch {
+      return
+    }
+  }
+
+  expandMergedCellsToSingles(sheet, range)
+  const topLeftCell = findCellAt(sheet, range.startRow, range.startCol)
+  if (!topLeftCell) {
+    ElMessage.warning('选区无效，无法执行合并')
+    return
+  }
+
+  const nextCells = []
+  for (const cell of sheet.cells) {
+    if (isCellTopLeftInsideRange(cell, range)) {
+      if (cell === topLeftCell) {
+        nextCells.push(cell)
+      }
+      continue
+    }
+    nextCells.push(cell)
+  }
+
+  topLeftCell.rowSpan = range.endRow - range.startRow + 1
+  topLeftCell.colSpan = range.endCol - range.startCol + 1
+  topLeftCell.forceDirty = false
+  topLeftCell.dirty = normalizeValue(topLeftCell.value) !== normalizeValue(topLeftCell.originalValue)
+
+  sheet.cells = dedupeCells(nextCells)
+  rebuildSheetRows(sheet)
+  selection.value = {
+    sheetName: sheet.name,
+    anchorStartRow: range.startRow,
+    anchorEndRow: range.endRow,
+    anchorStartCol: range.startCol,
+    anchorEndCol: range.endCol,
+    startRow: range.startRow,
+    endRow: range.endRow,
+    startCol: range.startCol,
+    endCol: range.endCol
+  }
+  refreshDirtyState()
+  ElMessage.success('已更新合并区域，保存后会写回文件')
+}
+
+function unmergeSelectedCells() {
+  const sheet = currentSheet.value
+  const range = activeSelection.value
+  if (!sheet || !range) {
+    ElMessage.warning('请先选择已合并的单元格')
+    return
+  }
+
+  const targetKeys = new Set(
+    sheet.cells
+      .filter((cell) => isMergedCell(cell) && rangesIntersect(range, getCellRange(cell)))
+      .map((cell) => buildCellKey(cell.rowIndex, cell.colIndex))
+  )
+
+  if (!targetKeys.size) {
+    ElMessage.info('当前选区内没有已合并单元格')
+    return
+  }
+
+  const nextCells = []
+  for (const cell of sheet.cells) {
+    const cellKey = buildCellKey(cell.rowIndex, cell.colIndex)
+    if (!targetKeys.has(cellKey)) {
+      nextCells.push(cell)
+      continue
+    }
+    nextCells.push(...splitMergedCell(sheet, cell, true))
+  }
+
+  sheet.cells = dedupeCells(nextCells)
+  rebuildSheetRows(sheet)
+  refreshDirtyState()
+  ElMessage.success('已拆分合并区域，保存后会写回文件')
+}
+
+function expandMergedCellsToSingles(sheet, range) {
+  const targetKeys = new Set(
+    sheet.cells
+      .filter((cell) => isMergedCell(cell) && rangesIntersect(range, getCellRange(cell)))
+      .map((cell) => buildCellKey(cell.rowIndex, cell.colIndex))
+  )
+
+  if (!targetKeys.size) {
+    return
+  }
+
+  const nextCells = []
+  for (const cell of sheet.cells) {
+    const cellKey = buildCellKey(cell.rowIndex, cell.colIndex)
+    if (!targetKeys.has(cellKey)) {
+      nextCells.push(cell)
+      continue
+    }
+    nextCells.push(...splitMergedCell(sheet, cell, true))
+  }
+
+  sheet.cells = dedupeCells(nextCells)
+}
+
+function splitMergedCell(sheet, cell, forceDirty = false) {
+  if (!isMergedCell(cell)) {
+    return [cell]
+  }
+
+  const items = []
+  for (let rowOffset = 0; rowOffset < cell.rowSpan; rowOffset += 1) {
+    for (let colOffset = 0; colOffset < cell.colSpan; colOffset += 1) {
+      const rowIndex = cell.rowIndex + rowOffset
+      const colIndex = cell.colIndex + colOffset
+      if (rowOffset === 0 && colOffset === 0) {
+        cell.rowSpan = 1
+        cell.colSpan = 1
+        syncCellDimensions(sheet, cell)
+        items.push(cell)
+        continue
+      }
+      items.push(createSyntheticCell(sheet, rowIndex, colIndex, cell.style, forceDirty))
+    }
+  }
+  return items
+}
+
+function createSyntheticCell(sheet, rowIndex, colIndex, style, forceDirty) {
+  const value = ''
+  return {
+    rowIndex,
+    colIndex,
+    rowSpan: 1,
+    colSpan: 1,
+    widthPx: resolveRangeWidth(sheet, colIndex, 1),
+    heightPx: resolveRangeHeight(sheet, rowIndex, 1),
+    value,
+    originalValue: value,
+    displayValue: value,
+    formula: false,
+    dirty: Boolean(forceDirty),
+    forceDirty: Boolean(forceDirty),
+    style: style ? { ...style } : {}
+  }
+}
+
+function findCellAt(sheet, rowIndex, colIndex) {
+  return sheet.cells.find((cell) => cell.rowIndex === rowIndex && cell.colIndex === colIndex) || null
+}
+
+function isCellTopLeftInsideRange(cell, range) {
+  return cell.rowIndex >= range.startRow
+    && cell.rowIndex <= range.endRow
+    && cell.colIndex >= range.startCol
+    && cell.colIndex <= range.endCol
+}
+
 function refreshDirtyState() {
-  let count = 0
+  let cellChanges = 0
   for (const sheet of sheets.value) {
-    for (const row of sheet.rows) {
-      for (const cell of row.cells) {
-        if (cell.dirty) {
-          count += 1
-        }
+    for (const cell of sheet.cells) {
+      if (cell.dirty) {
+        cellChanges += 1
       }
     }
   }
-  dirtyCount.value = count
-  isDirty.value = count > 0
+  const mergeChanges = countMergeChanges()
+  dirtyCount.value = cellChanges + mergeChanges
+  isDirty.value = dirtyCount.value > 0
+}
+
+function countMergeChanges() {
+  let count = 0
+  for (const sheet of sheets.value) {
+    const current = new Set(collectSheetMergeKeys(sheet))
+    const original = new Set(sheet.originalMergeKeys || [])
+    for (const key of current) {
+      if (!original.has(key)) {
+        count += 1
+      }
+    }
+    for (const key of original) {
+      if (!current.has(key)) {
+        count += 1
+      }
+    }
+  }
+  return count
+}
+
+function collectSheetMergeKeys(sheet) {
+  return sheet.cells
+    .filter((cell) => isMergedCell(cell))
+    .map((cell) => `${cell.rowIndex}:${cell.colIndex}:${cell.rowSpan}:${cell.colSpan}`)
+    .sort()
 }
 
 function collectChanges() {
   const changes = []
   for (const sheet of sheets.value) {
-    for (const row of sheet.rows) {
-      for (const cell of row.cells) {
-        if (!cell.dirty) {
-          continue
-        }
-        changes.push({
-          sheetName: sheet.name,
-          rowIndex: cell.rowIndex,
-          colIndex: cell.colIndex,
-          value: normalizeValue(cell.value)
-        })
+    for (const cell of sheet.cells) {
+      if (!cell.dirty) {
+        continue
       }
+      changes.push({
+        sheetName: sheet.name,
+        rowIndex: cell.rowIndex,
+        colIndex: cell.colIndex,
+        value: normalizeValue(cell.value)
+      })
     }
   }
   return changes
+}
+
+function collectMergeRegions() {
+  const regions = []
+  for (const sheet of sheets.value) {
+    for (const cell of sheet.cells) {
+      if (!isMergedCell(cell)) {
+        continue
+      }
+      regions.push({
+        sheetName: sheet.name,
+        firstRow: cell.rowIndex,
+        lastRow: cell.rowIndex + cell.rowSpan - 1,
+        firstColumn: cell.colIndex,
+        lastColumn: cell.colIndex + cell.colSpan - 1
+      })
+    }
+  }
+  return regions
 }
 
 async function saveToServer() {
@@ -293,8 +760,10 @@ async function saveToServer() {
     ElMessage.warning('请先选择并加载一份 Excel 文件')
     return
   }
+
   const changes = collectChanges()
-  if (!changes.length) {
+  const mergeChanges = countMergeChanges()
+  if (!changes.length && !mergeChanges) {
     ElMessage.info('当前没有需要保存的修改')
     return
   }
@@ -303,7 +772,8 @@ async function saveToServer() {
   try {
     const response = await applyExcelWorkbookChanges({
       fileName: currentFileName.value,
-      changes
+      changes,
+      mergeRegions: mergeChanges ? collectMergeRegions() : undefined
     })
     const nextFileName = response?.data?.currentFileName || currentFileName.value
     await loadWorkbookByFileName(nextFileName, true)
@@ -337,15 +807,141 @@ async function downloadServerWorkbook() {
   }
 }
 
-function buildCellTdStyle(cell) {
+function hasBackgroundImages(sheet) {
+  return sheetHasBackgroundImage(sheet)
+}
+
+function hasAnchoredImages(sheet) {
+  const images = Array.isArray(sheet?.images) ? sheet.images : []
+  return images.some((image) => image.kind === 'anchored')
+}
+
+function listBackgroundImages(sheet) {
+  const images = Array.isArray(sheet?.images) ? sheet.images : []
+  return images.filter((image) => image.kind === 'background')
+}
+
+function listAnchoredImages(sheet) {
+  const images = Array.isArray(sheet?.images) ? sheet.images : []
+  return images.filter((image) => image.kind === 'anchored')
+}
+
+function sheetHasBackgroundImage(sheet) {
+  const images = Array.isArray(sheet?.images) ? sheet.images : []
+  return images.some((image) => image.kind === 'background')
+}
+
+function buildImageKey(image, index) {
+  return `${image.kind}:${image.row1}:${image.col1}:${image.widthPx}:${image.heightPx}:${index}`
+}
+
+function buildSheetStageStyle(sheet) {
   return {
+    width: `${resolveSheetPixelWidth(sheet)}px`,
+    minWidth: '100%',
+    minHeight: `${resolveSheetPixelHeight(sheet)}px`
+  }
+}
+
+function buildImageStyle(image) {
+  const sheet = currentSheet.value
+  if (!sheet) {
+    return {}
+  }
+
+  const dx = Math.max(Number(image?.dx1Px ?? 0), 0)
+  const dy = Math.max(Number(image?.dy1Px ?? 0), 0)
+  const top = resolveFrozenTopOffset(sheet, image.row1) + dy
+  const left = ROW_INDEX_WIDTH + resolveFrozenLeftOffset(sheet, image.col1) + dx
+
+  const style = {
+    top: `${top}px`,
+    left: `${left}px`,
+    width: `${Math.max(Number(image?.widthPx ?? 0), 1)}px`,
+    height: `${Math.max(Number(image?.heightPx ?? 0), 1)}px`
+  }
+
+  const freezePane = sheet.freezePane || { xSplit: 0, ySplit: 0 }
+  const freezeRows = Math.max(Number(freezePane.ySplit ?? 0), 0)
+  const freezeColumns = Math.max(Number(freezePane.xSplit ?? 0), 0)
+  const inFrozenRow = image.kind !== 'background' && image.row1 < freezeRows
+  const inFrozenColumn = image.kind !== 'background' && image.col1 < freezeColumns
+  if (inFrozenRow || inFrozenColumn) {
+    style.position = 'sticky'
+    if (inFrozenRow) {
+      style.top = `${top}px`
+    }
+    if (inFrozenColumn) {
+      style.left = `${left}px`
+    }
+    style.zIndex = inFrozenRow && inFrozenColumn ? 8 : 7
+  }
+  return style
+}
+
+function buildCellTdStyle(cell) {
+  const sheet = currentSheet.value
+  const defaultBackground = sheet && sheetHasBackgroundImage(sheet) ? 'transparent' : '#ffffff'
+  const style = {
     width: `${cell.widthPx}px`,
     minWidth: `${cell.widthPx}px`,
     height: `${cell.heightPx}px`,
-    backgroundColor: cell.style?.backgroundColor || '',
+    backgroundColor: cell.style?.backgroundColor || defaultBackground,
     textAlign: cell.style?.textAlign || 'left',
-    verticalAlign: cell.style?.verticalAlign || 'top'
+    verticalAlign: cell.style?.verticalAlign || 'top',
+    borderTop: cell.style?.borderTop || '',
+    borderRight: cell.style?.borderRight || '',
+    borderBottom: cell.style?.borderBottom || '',
+    borderLeft: cell.style?.borderLeft || ''
   }
+
+  if (!sheet) {
+    return style
+  }
+
+  const freezePane = sheet.freezePane || { xSplit: 0, ySplit: 0 }
+  const freezeRows = Math.max(Number(freezePane.ySplit ?? 0), 0)
+  const freezeColumns = Math.max(Number(freezePane.xSplit ?? 0), 0)
+  const inFrozenRow = cell.rowIndex < freezeRows
+  const inFrozenColumn = cell.colIndex < freezeColumns
+
+  if (inFrozenRow || inFrozenColumn) {
+    style.position = 'sticky'
+    if (inFrozenRow) {
+      style.top = `${resolveFrozenTopOffset(sheet, cell.rowIndex)}px`
+    }
+    if (inFrozenColumn) {
+      style.left = `${ROW_INDEX_WIDTH + resolveFrozenLeftOffset(sheet, cell.colIndex)}px`
+    }
+    style.zIndex = inFrozenRow && inFrozenColumn ? 5 : 4
+    style.boxShadow = 'inset 0 0 0 1px rgba(15, 122, 90, 0.08)'
+  }
+
+  return style
+}
+
+function buildCellClass(cell) {
+  return {
+    selected: isCellSelected(cell),
+    'has-validation': hasValidationOptions(cell)
+  }
+}
+
+function buildRowIndexStyle(row) {
+  const style = {
+    height: `${row.heightPx}px`
+  }
+
+  const sheet = currentSheet.value
+  if (!sheet) {
+    return style
+  }
+  const freezeRows = Math.max(Number(sheet.freezePane?.ySplit ?? 0), 0)
+  if (row.rowIndex < freezeRows) {
+    style.top = `${resolveFrozenTopOffset(sheet, row.rowIndex)}px`
+    style.zIndex = 7
+  }
+  return style
 }
 
 function buildCellInputStyle(cell) {
@@ -359,8 +955,58 @@ function buildCellInputStyle(cell) {
     fontSize: cell.style?.fontSize || '',
     fontFamily: cell.style?.fontFamily || '',
     textDecoration: cell.style?.textDecoration || '',
-    whiteSpace: cell.style?.whiteSpace || 'pre-wrap'
+    whiteSpace: cell.style?.whiteSpace || 'nowrap'
   }
+}
+
+function resolveFrozenTopOffset(sheet, rowIndex) {
+  let total = 0
+  for (let index = 0; index < rowIndex; index += 1) {
+    total += Math.max(Number(sheet.rowHeights[index] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+  }
+  return total
+}
+
+function resolveFrozenLeftOffset(sheet, columnIndex) {
+  let total = 0
+  for (let index = 0; index < columnIndex; index += 1) {
+    total += Math.max(Number(sheet.columnWidths[index] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+  }
+  return total
+}
+
+function resolveSheetPixelWidth(sheet) {
+  if (!sheet) {
+    return ROW_INDEX_WIDTH + DEFAULT_COLUMN_WIDTH
+  }
+  let total = ROW_INDEX_WIDTH
+  const maxColumnCount = Math.max(Number(sheet.maxColumnCount ?? 0), 1)
+  for (let index = 0; index < maxColumnCount; index += 1) {
+    total += Math.max(Number(sheet.columnWidths[index] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+  }
+  return total
+}
+
+function resolveSheetPixelHeight(sheet) {
+  if (!sheet) {
+    return DEFAULT_ROW_HEIGHT
+  }
+  let total = 0
+  const rowCount = Math.max(Number(sheet.rowCount ?? 0), 1)
+  for (let index = 0; index < rowCount; index += 1) {
+    total += Math.max(Number(sheet.rowHeights[index] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+  }
+  return total
+}
+
+function hasValidationOptions(cell) {
+  return Array.isArray(cell?.validationOptions) && cell.validationOptions.length > 0
+}
+
+function buildCellDatalistId(cell) {
+  const sheet = activeSheetName.value || 'sheet'
+  const safeSheetName = String(sheet).replace(/[^a-zA-Z0-9_-]/g, '_')
+  return `excel-list-${safeSheetName}-${cell.rowIndex}-${cell.colIndex}`
 }
 
 function normalizeValue(value) {
@@ -374,6 +1020,147 @@ function normalizeQueryFileName(value) {
   return value || ''
 }
 
+function getCellRange(cell) {
+  return {
+    startRow: cell.rowIndex,
+    endRow: cell.rowIndex + cell.rowSpan - 1,
+    startCol: cell.colIndex,
+    endCol: cell.colIndex + cell.colSpan - 1
+  }
+}
+
+function getSelectionArea(range) {
+  return (range.endRow - range.startRow + 1) * (range.endCol - range.startCol + 1)
+}
+
+function isMergedCell(cell) {
+  return cell.rowSpan > 1 || cell.colSpan > 1
+}
+
+function rangesIntersect(left, right) {
+  return left.startRow <= right.endRow
+    && left.endRow >= right.startRow
+    && left.startCol <= right.endCol
+    && left.endCol >= right.startCol
+}
+
+function formatSelectionRange(range) {
+  const startLabel = `${toColumnLabel(range.startCol)}${range.startRow + 1}`
+  const endLabel = `${toColumnLabel(range.endCol)}${range.endRow + 1}`
+  return startLabel === endLabel ? startLabel : `${startLabel}:${endLabel}`
+}
+
+function toColumnLabel(columnIndex) {
+  let label = ''
+  let current = Math.max(Number(columnIndex ?? 0), 0) + 1
+  while (current > 0) {
+    const remainder = (current - 1) % 26
+    label = String.fromCharCode(65 + remainder) + label
+    current = Math.floor((current - 1) / 26)
+  }
+  return label || 'A'
+}
+
+function ensureArraySize(target, size, defaultValue) {
+  while (target.length < size) {
+    target.push(defaultValue)
+  }
+}
+
+function ensureSheetBounds(sheet, requiredRowCount, requiredColumnCount) {
+  sheet.rowCount = Math.max(sheet.rowCount, requiredRowCount, 1)
+  sheet.maxColumnCount = Math.max(sheet.maxColumnCount, requiredColumnCount, 1)
+  ensureArraySize(sheet.rowHeights, sheet.rowCount, DEFAULT_ROW_HEIGHT)
+  ensureArraySize(sheet.columnWidths, sheet.maxColumnCount, DEFAULT_COLUMN_WIDTH)
+  if (!sheet.freezePane) {
+    sheet.freezePane = normalizeFreezePane(null)
+  }
+  sheet.freezePane.xSplit = Math.min(Math.max(Number(sheet.freezePane.xSplit ?? 0), 0), sheet.maxColumnCount)
+  sheet.freezePane.ySplit = Math.min(Math.max(Number(sheet.freezePane.ySplit ?? 0), 0), sheet.rowCount)
+}
+
+function resolveRangeWidth(sheet, startColumnIndex, colSpan) {
+  ensureSheetBounds(sheet, sheet.rowCount, startColumnIndex + colSpan)
+  let total = 0
+  for (let offset = 0; offset < colSpan; offset += 1) {
+    total += Math.max(Number(sheet.columnWidths[startColumnIndex + offset] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+  }
+  return total
+}
+
+function resolveRangeHeight(sheet, startRowIndex, rowSpan) {
+  ensureSheetBounds(sheet, startRowIndex + rowSpan, sheet.maxColumnCount)
+  let total = 0
+  for (let offset = 0; offset < rowSpan; offset += 1) {
+    total += Math.max(Number(sheet.rowHeights[startRowIndex + offset] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+  }
+  return total
+}
+
+function syncCellDimensions(sheet, cell) {
+  ensureSheetBounds(sheet, cell.rowIndex + cell.rowSpan, cell.colIndex + cell.colSpan)
+  cell.widthPx = resolveRangeWidth(sheet, cell.colIndex, cell.colSpan)
+  cell.heightPx = resolveRangeHeight(sheet, cell.rowIndex, cell.rowSpan)
+  cell.validationOptions = resolveCellValidationOptions(sheet, cell.rowIndex, cell.colIndex)
+}
+
+function resolveCellValidationOptions(sheet, rowIndex, colIndex) {
+  const validations = Array.isArray(sheet?.validations) ? sheet.validations : []
+  for (const validation of validations) {
+    if (rowIndex < validation.firstRow || rowIndex > validation.lastRow) {
+      continue
+    }
+    if (colIndex < validation.firstColumn || colIndex > validation.lastColumn) {
+      continue
+    }
+    return Array.isArray(validation.options) ? validation.options : []
+  }
+  return []
+}
+
+function dedupeCells(cells) {
+  const cellMap = new Map()
+  for (const cell of cells) {
+    cellMap.set(buildCellKey(cell.rowIndex, cell.colIndex), cell)
+  }
+  return Array.from(cellMap.values()).sort((left, right) => {
+    if (left.rowIndex !== right.rowIndex) {
+      return left.rowIndex - right.rowIndex
+    }
+    return left.colIndex - right.colIndex
+  })
+}
+
+function rebuildSheetRows(sheet) {
+  let rowCount = Math.max(Number(sheet.rowCount ?? 0), 1)
+  let maxColumnCount = Math.max(Number(sheet.maxColumnCount ?? 0), 1)
+
+  for (const cell of sheet.cells) {
+    rowCount = Math.max(rowCount, cell.rowIndex + cell.rowSpan)
+    maxColumnCount = Math.max(maxColumnCount, cell.colIndex + cell.colSpan)
+  }
+
+  ensureSheetBounds(sheet, rowCount, maxColumnCount)
+  sheet.cells = dedupeCells(sheet.cells)
+
+  const rows = Array.from({ length: sheet.rowCount }, (_, rowIndex) => ({
+    rowIndex,
+    heightPx: Math.max(Number(sheet.rowHeights[rowIndex] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT),
+    cells: []
+  }))
+
+  for (const cell of sheet.cells) {
+    syncCellDimensions(sheet, cell)
+    rows[cell.rowIndex].cells.push(cell)
+  }
+
+  sheet.rows = rows
+}
+
+function buildCellKey(rowIndex, colIndex) {
+  return `${rowIndex}:${colIndex}`
+}
+
 function goToFileCenter() {
   router.push('/excel-editor/files')
 }
@@ -382,53 +1169,53 @@ function goToFileCenter() {
 <style lang="scss" scoped>
 .excel-editor-page {
   min-height: calc(100vh - 84px);
-  padding: 24px;
-  background:
-    radial-gradient(circle at top right, rgba(16, 109, 79, 0.12), transparent 28%),
-    linear-gradient(180deg, #f4f7f2 0%, #edf2ed 100%);
+  padding: 16px;
+  background: #f6f8fb;
 }
 
 .hero-card,
 .summary-card,
 .editor-shell {
-  border: 1px solid rgba(16, 88, 68, 0.1);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 16px 38px rgba(31, 44, 37, 0.08);
+  border: 1px solid #e4e8ef;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: none;
 }
 
 .hero-card {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 16px;
-  padding: 24px;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
 }
 
 .eyebrow {
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #0f7a5a;
+  color: #6b7280;
 }
 
 h1 {
   margin: 0;
-  font-size: 30px;
-  line-height: 1.1;
-  color: #17352a;
+  font-size: 20px;
+  line-height: 1.3;
+  color: #111827;
 }
 
 .hero-desc {
-  margin: 10px 0 0;
-  color: #4f6559;
-  line-height: 1.6;
+  margin: 6px 0 0;
+  color: #6b7280;
+  line-height: 1.4;
+  font-size: 13px;
 }
 
 .hero-actions,
-.toolbar-left {
+.toolbar-left,
+.toolbar-right {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -442,39 +1229,40 @@ h1 {
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .summary-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-height: 110px;
-  padding: 18px 20px;
+  gap: 4px;
+  min-height: 0;
+  padding: 10px 12px;
 }
 
 .summary-label {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #728579;
+  color: #6b7280;
 }
 
 .summary-card strong {
-  font-size: 18px;
+  font-size: 14px;
   line-height: 1.35;
-  color: #20392d;
+  color: #111827;
 }
 
 .summary-card span:last-child {
-  color: #627669;
-  line-height: 1.5;
+  color: #6b7280;
+  line-height: 1.35;
+  font-size: 12px;
 }
 
 .editor-shell {
-  padding: 18px;
+  padding: 12px;
 }
 
 .toolbar {
@@ -485,6 +1273,16 @@ h1 {
   margin-bottom: 14px;
 }
 
+.toolbar-right {
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.selection-tip {
+  font-size: 12px;
+  color: #4b5563;
+}
+
 .sheet-tabs {
   margin-bottom: 12px;
 }
@@ -492,18 +1290,72 @@ h1 {
 .grid-wrap {
   overflow: auto;
   max-height: calc(100vh - 390px);
-  border: 1px solid #dce7de;
-  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
   background: #fff;
 }
 
+.sheet-stage {
+  position: relative;
+  width: max-content;
+  min-width: 100%;
+}
+
 .sheet-grid {
+  position: relative;
+  z-index: 3;
   min-width: 100%;
   border-collapse: collapse;
 }
 
 .sheet-grid td {
-  border: 1px solid #dfe6e1;
+  border: 1px solid #e5e7eb;
+}
+
+.sheet-image-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sheet-image-layer-background {
+  z-index: 1;
+}
+
+.sheet-image-layer-foreground {
+  z-index: 6;
+}
+
+.sheet-image-item {
+  position: absolute;
+  overflow: hidden;
+}
+
+.sheet-image-item.background {
+  opacity: 1;
+}
+
+.sheet-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: fill;
+  user-select: none;
+}
+
+.sheet-cell {
+  position: relative;
+  background: #fff;
+  transition: box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.sheet-cell.selected {
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.65);
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.sheet-cell.selected .cell-input {
+  background: rgba(37, 99, 235, 0.04);
 }
 
 .row-index {
@@ -515,8 +1367,8 @@ h1 {
   padding: 0 8px;
   text-align: center;
   font-weight: 700;
-  color: #537063;
-  background: #edf7f1;
+  color: #374151;
+  background: #f3f4f6;
 }
 
 .cell-input {
@@ -530,6 +1382,21 @@ h1 {
   background: transparent;
   line-height: 1.45;
   overflow: hidden;
+}
+
+.cell-select {
+  padding-right: 26px;
+}
+
+.sheet-cell.has-validation::after {
+  content: "▼";
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(55, 65, 81, 0.6);
+  pointer-events: none;
 }
 
 .cell-input.dirty {
@@ -552,7 +1419,8 @@ h1 {
   }
 
   .hero-card,
-  .toolbar {
+  .toolbar,
+  .toolbar-right {
     flex-direction: column;
     align-items: flex-start;
   }
