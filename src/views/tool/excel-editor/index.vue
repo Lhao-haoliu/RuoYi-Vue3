@@ -71,9 +71,32 @@
             </div>
 
             <table class="sheet-grid">
+              <thead>
+                <tr>
+                  <th class="corner-header"></th>
+                  <th
+                    v-for="columnIndex in currentSheet.maxColumnCount"
+                    :key="`header-col-${columnIndex}`"
+                    class="column-header"
+                    :style="buildColumnHeaderStyle(currentSheet, columnIndex - 1)"
+                  >
+                    <span class="column-label">{{ toColumnLabel(columnIndex - 1) }}</span>
+                    <span
+                      class="resize-handle col-resize-handle"
+                      @mousedown="startColumnResize(columnIndex - 1, $event)"
+                    ></span>
+                  </th>
+                </tr>
+              </thead>
               <tbody>
                 <tr v-for="row in currentSheet.rows" :key="`row-${row.rowIndex}`">
-                  <td class="row-index" :style="buildRowIndexStyle(row)">{{ row.rowIndex + 1 }}</td>
+                  <td class="row-index" :style="buildRowIndexStyle(row)">
+                    {{ row.rowIndex + 1 }}
+                    <span
+                      class="resize-handle row-resize-handle"
+                      @mousedown="startRowResize(row.rowIndex, $event)"
+                    ></span>
+                  </td>
                   <td
                     v-for="cell in row.cells"
                     :key="`cell-${row.rowIndex}-${cell.colIndex}`"
@@ -144,7 +167,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { saveAs } from 'file-saver'
@@ -155,6 +178,7 @@ const MIN_ROW_HEIGHT = 24
 const DEFAULT_COLUMN_WIDTH = 96
 const MIN_COLUMN_WIDTH = 72
 const DEFAULT_CELL_HEIGHT = 32
+const COLUMN_HEADER_HEIGHT = 34
 const ROW_INDEX_WIDTH = 56
 const MAX_CELL_TEXT_LENGTH = 32767
 
@@ -173,6 +197,8 @@ const dirtyCount = ref(0)
 const revertingRoute = ref(false)
 const selection = ref(null)
 const showedCellLimitHint = ref(false)
+const columnResizeState = ref(null)
+const rowResizeState = ref(null)
 
 const currentSheet = computed(() => sheets.value.find((sheet) => sheet.name === activeSheetName.value) || null)
 const hasWorkbook = computed(() => sheets.value.length > 0)
@@ -205,6 +231,10 @@ onMounted(async () => {
   await initializeFromRoute()
 })
 
+onBeforeUnmount(() => {
+  clearResizeState()
+})
+
 watch(
   () => route.query.fileName,
   async (nextValue, previousValue) => {
@@ -229,6 +259,7 @@ watch(
 )
 
 watch(activeSheetName, () => {
+  clearResizeState()
   clearSelection()
 })
 
@@ -351,11 +382,15 @@ function normalizeSheet(sheet) {
     images,
     cells: dedupeCells(cells),
     rows: [],
-    originalMergeKeys: []
+    originalMergeKeys: [],
+    originalRowHeights: [],
+    originalColumnWidths: []
   }
 
   rebuildSheetRows(normalized)
   normalized.originalMergeKeys = collectSheetMergeKeys(normalized)
+  normalized.originalRowHeights = normalized.rowHeights.map((height) => Math.round(Number(height)))
+  normalized.originalColumnWidths = normalized.columnWidths.map((width) => Math.round(Number(width)))
   return normalized
 }
 
@@ -706,7 +741,8 @@ function refreshDirtyState() {
     }
   }
   const mergeChanges = countMergeChanges()
-  dirtyCount.value = cellChanges + mergeChanges
+  const dimensionChanges = countDimensionChanges()
+  dirtyCount.value = cellChanges + mergeChanges + dimensionChanges
   isDirty.value = dirtyCount.value > 0
 }
 
@@ -773,6 +809,67 @@ function collectMergeRegions() {
   return regions
 }
 
+function countDimensionChanges() {
+  let count = 0
+  for (const sheet of sheets.value) {
+    const rowLength = Math.max(sheet.rowHeights.length, (sheet.originalRowHeights || []).length)
+    for (let index = 0; index < rowLength; index += 1) {
+      const current = Math.round(Number(sheet.rowHeights[index] ?? DEFAULT_ROW_HEIGHT))
+      const original = Math.round(Number(sheet.originalRowHeights?.[index] ?? DEFAULT_ROW_HEIGHT))
+      if (current !== original) {
+        count += 1
+      }
+    }
+    const columnLength = Math.max(sheet.columnWidths.length, (sheet.originalColumnWidths || []).length)
+    for (let index = 0; index < columnLength; index += 1) {
+      const current = Math.round(Number(sheet.columnWidths[index] ?? DEFAULT_COLUMN_WIDTH))
+      const original = Math.round(Number(sheet.originalColumnWidths?.[index] ?? DEFAULT_COLUMN_WIDTH))
+      if (current !== original) {
+        count += 1
+      }
+    }
+  }
+  return count
+}
+
+function collectRowHeightChanges() {
+  const changes = []
+  for (const sheet of sheets.value) {
+    const rowLength = Math.max(sheet.rowHeights.length, (sheet.originalRowHeights || []).length)
+    for (let index = 0; index < rowLength; index += 1) {
+      const current = Math.round(Number(sheet.rowHeights[index] ?? DEFAULT_ROW_HEIGHT))
+      const original = Math.round(Number(sheet.originalRowHeights?.[index] ?? DEFAULT_ROW_HEIGHT))
+      if (current !== original) {
+        changes.push({
+          sheetName: sheet.name,
+          rowIndex: index,
+          heightPx: current
+        })
+      }
+    }
+  }
+  return changes
+}
+
+function collectColumnWidthChanges() {
+  const changes = []
+  for (const sheet of sheets.value) {
+    const columnLength = Math.max(sheet.columnWidths.length, (sheet.originalColumnWidths || []).length)
+    for (let index = 0; index < columnLength; index += 1) {
+      const current = Math.round(Number(sheet.columnWidths[index] ?? DEFAULT_COLUMN_WIDTH))
+      const original = Math.round(Number(sheet.originalColumnWidths?.[index] ?? DEFAULT_COLUMN_WIDTH))
+      if (current !== original) {
+        changes.push({
+          sheetName: sheet.name,
+          colIndex: index,
+          widthPx: current
+        })
+      }
+    }
+  }
+  return changes
+}
+
 async function saveToServer() {
   if (!currentFileName.value || !hasWorkbook.value) {
     ElMessage.warning('请先选择并加载一份 Excel 文件')
@@ -781,7 +878,9 @@ async function saveToServer() {
 
   const changes = collectChanges()
   const mergeChanges = countMergeChanges()
-  if (!changes.length && !mergeChanges) {
+  const rowHeightChanges = collectRowHeightChanges()
+  const columnWidthChanges = collectColumnWidthChanges()
+  if (!changes.length && !mergeChanges && !rowHeightChanges.length && !columnWidthChanges.length) {
     ElMessage.info('当前没有需要保存的修改')
     return
   }
@@ -791,7 +890,9 @@ async function saveToServer() {
     const response = await applyExcelWorkbookChanges({
       fileName: currentFileName.value,
       changes,
-      mergeRegions: mergeChanges ? collectMergeRegions() : undefined
+      mergeRegions: mergeChanges ? collectMergeRegions() : undefined,
+      rowHeights: rowHeightChanges.length ? rowHeightChanges : undefined,
+      columnWidths: columnWidthChanges.length ? columnWidthChanges : undefined
     })
     const nextFileName = response?.data?.currentFileName || currentFileName.value
     await loadWorkbookByFileName(nextFileName, true)
@@ -869,7 +970,7 @@ function buildImageStyle(image) {
 
   const dx = Math.max(Number(image?.dx1Px ?? 0), 0)
   const dy = Math.max(Number(image?.dy1Px ?? 0), 0)
-  const top = resolveFrozenTopOffset(sheet, image.row1) + dy
+  const top = COLUMN_HEADER_HEIGHT + resolveFrozenTopOffset(sheet, image.row1) + dy
   const left = ROW_INDEX_WIDTH + resolveFrozenLeftOffset(sheet, image.col1) + dx
 
   const style = {
@@ -926,7 +1027,7 @@ function buildCellTdStyle(cell) {
   if (inFrozenRow || inFrozenColumn) {
     style.position = 'sticky'
     if (inFrozenRow) {
-      style.top = `${resolveFrozenTopOffset(sheet, cell.rowIndex)}px`
+      style.top = `${COLUMN_HEADER_HEIGHT + resolveFrozenTopOffset(sheet, cell.rowIndex)}px`
     }
     if (inFrozenColumn) {
       style.left = `${ROW_INDEX_WIDTH + resolveFrozenLeftOffset(sheet, cell.colIndex)}px`
@@ -956,8 +1057,23 @@ function buildRowIndexStyle(row) {
   }
   const freezeRows = Math.max(Number(sheet.freezePane?.ySplit ?? 0), 0)
   if (row.rowIndex < freezeRows) {
-    style.top = `${resolveFrozenTopOffset(sheet, row.rowIndex)}px`
+    style.top = `${COLUMN_HEADER_HEIGHT + resolveFrozenTopOffset(sheet, row.rowIndex)}px`
     style.zIndex = 7
+  }
+  return style
+}
+
+function buildColumnHeaderStyle(sheet, columnIndex) {
+  const width = Math.max(Number(sheet?.columnWidths?.[columnIndex] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+  const style = {
+    width: `${width}px`,
+    minWidth: `${width}px`,
+    height: `${COLUMN_HEADER_HEIGHT}px`
+  }
+  const freezeColumns = Math.max(Number(sheet?.freezePane?.xSplit ?? 0), 0)
+  if (columnIndex < freezeColumns) {
+    style.left = `${ROW_INDEX_WIDTH + resolveFrozenLeftOffset(sheet, columnIndex)}px`
+    style.zIndex = 10
   }
   return style
 }
@@ -1007,9 +1123,9 @@ function resolveSheetPixelWidth(sheet) {
 
 function resolveSheetPixelHeight(sheet) {
   if (!sheet) {
-    return DEFAULT_ROW_HEIGHT
+    return COLUMN_HEADER_HEIGHT + DEFAULT_ROW_HEIGHT
   }
-  let total = 0
+  let total = COLUMN_HEADER_HEIGHT
   const rowCount = Math.max(Number(sheet.rowCount ?? 0), 1)
   for (let index = 0; index < rowCount; index += 1) {
     total += Math.max(Number(sheet.rowHeights[index] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
@@ -1025,6 +1141,87 @@ function buildCellDatalistId(cell) {
   const sheet = activeSheetName.value || 'sheet'
   const safeSheetName = String(sheet).replace(/[^a-zA-Z0-9_-]/g, '_')
   return `excel-list-${safeSheetName}-${cell.rowIndex}-${cell.colIndex}`
+}
+
+function startColumnResize(colIndex, event) {
+  if (!currentSheet.value) {
+    return
+  }
+  event.preventDefault()
+  event.stopPropagation()
+  const sheet = currentSheet.value
+  columnResizeState.value = {
+    sheetName: sheet.name,
+    colIndex,
+    startX: Number(event.clientX || 0),
+    startWidth: Math.max(Number(sheet.columnWidths[colIndex] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+  }
+  rowResizeState.value = null
+  document.body.style.cursor = 'col-resize'
+  window.addEventListener('mousemove', handleResizePointerMove)
+  window.addEventListener('mouseup', stopResize)
+}
+
+function startRowResize(rowIndex, event) {
+  if (!currentSheet.value) {
+    return
+  }
+  event.preventDefault()
+  event.stopPropagation()
+  const sheet = currentSheet.value
+  rowResizeState.value = {
+    sheetName: sheet.name,
+    rowIndex,
+    startY: Number(event.clientY || 0),
+    startHeight: Math.max(Number(sheet.rowHeights[rowIndex] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+  }
+  columnResizeState.value = null
+  document.body.style.cursor = 'row-resize'
+  window.addEventListener('mousemove', handleResizePointerMove)
+  window.addEventListener('mouseup', stopResize)
+}
+
+function handleResizePointerMove(event) {
+  const sheet = currentSheet.value
+  if (!sheet) {
+    clearResizeState()
+    return
+  }
+
+  if (columnResizeState.value && columnResizeState.value.sheetName === sheet.name) {
+    const state = columnResizeState.value
+    const delta = Number(event.clientX || 0) - state.startX
+    const nextWidth = Math.max(MIN_COLUMN_WIDTH, Math.round(state.startWidth + delta))
+    if (sheet.columnWidths[state.colIndex] !== nextWidth) {
+      sheet.columnWidths[state.colIndex] = nextWidth
+      rebuildSheetRows(sheet)
+      refreshDirtyState()
+    }
+    return
+  }
+
+  if (rowResizeState.value && rowResizeState.value.sheetName === sheet.name) {
+    const state = rowResizeState.value
+    const delta = Number(event.clientY || 0) - state.startY
+    const nextHeight = Math.max(MIN_ROW_HEIGHT, Math.round(state.startHeight + delta))
+    if (sheet.rowHeights[state.rowIndex] !== nextHeight) {
+      sheet.rowHeights[state.rowIndex] = nextHeight
+      rebuildSheetRows(sheet)
+      refreshDirtyState()
+    }
+  }
+}
+
+function stopResize() {
+  clearResizeState()
+}
+
+function clearResizeState() {
+  columnResizeState.value = null
+  rowResizeState.value = null
+  document.body.style.cursor = ''
+  window.removeEventListener('mousemove', handleResizePointerMove)
+  window.removeEventListener('mouseup', stopResize)
 }
 
 function normalizeValue(value) {
@@ -1341,8 +1538,41 @@ h1 {
   border-collapse: collapse;
 }
 
-.sheet-grid td {
+.sheet-grid td,
+.sheet-grid th {
   border: 1px solid #e5e7eb;
+}
+
+.sheet-grid thead th {
+  position: sticky;
+  top: 0;
+}
+
+.corner-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 11;
+  min-width: 56px;
+  width: 56px;
+  height: 34px;
+  background: #f3f4f6;
+}
+
+.column-header {
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  padding: 0 18px 0 10px;
+  text-align: center;
+  font-weight: 700;
+  color: #374151;
+  background: #f3f4f6;
+}
+
+.column-label {
+  display: inline-block;
+  line-height: 1;
 }
 
 .sheet-image-layer {
@@ -1402,6 +1632,27 @@ h1 {
   font-weight: 700;
   color: #374151;
   background: #f3f4f6;
+}
+
+.resize-handle {
+  position: absolute;
+  user-select: none;
+}
+
+.col-resize-handle {
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.row-resize-handle {
+  left: 0;
+  bottom: -4px;
+  width: 100%;
+  height: 8px;
+  cursor: row-resize;
 }
 
 .cell-input {
