@@ -1,4 +1,4 @@
-// base color
+﻿// base color
 $blue: #324157;
 $light-blue: #333c46;
 $red: #C03639;
@@ -8,34 +8,34 @@ $tiffany: #4AB7BD;
 $yellow: #FEC171;
 $panGreen: #30B08F;
 
-// 默认主题变量
-$menuText: #bfcbd9;
-$menuActiveText: #409eff;
-$menuBg: #304156;
-$menuHover: #263445;
+// 榛樿涓婚鍙橀噺
+$menuText: #4b5563;
+$menuActiveText: #2563eb;
+$menuBg: #ffffff;
+$menuHover: #f3f4f6;
 
-// 浅色主题theme-light
+// 娴呰壊涓婚theme-light
 $menuLightBg: #ffffff;
-$menuLightHover: #f0f1f5;
-$menuLightText: #303133;
-$menuLightActiveText: #409EFF;
+$menuLightHover: #f3f4f6;
+$menuLightText: #4b5563;
+$menuLightActiveText: #2563EB;
 
-// 基础变量
+// 鍩虹鍙橀噺
 $base-sidebar-width: 200px;
 $sideBarWidth: 200px;
 
-// 菜单暗色变量
+// 鑿滃崟鏆楄壊鍙橀噺
 $base-menu-color: #bfcbd9;
-$base-menu-color-active: #f4f4f5;
-$base-menu-background: #304156;
-$base-sub-menu-background: #1f2d3d;
-$base-sub-menu-hover: #001528;
+$base-menu-color-active: #2563eb;
+$base-menu-background: #ffffff;
+$base-sub-menu-background: #ffffff;
+$base-sub-menu-hover: #f3f4f6;
 
-// 组件变量
-$--color-primary: #409EFF;
-$--color-success: #67C23A;
-$--color-warning: #E6A23C;
-$--color-danger: #F56C6C;
+// 缁勪欢鍙橀噺
+$--color-primary: #2563EB;
+$--color-success: #10B981;
+$--color-warning: #F59E0B;
+$--color-danger: #EF4444;
 $--color-info: #909399;
 
 :export {
@@ -48,7 +48,7 @@ $--color-info: #909399;
   menuLightText: $menuLightText;
   menuLightActiveText: $menuLightActiveText;
   sideBarWidth: $sideBarWidth;
-  // 导出基础颜色
+  // 瀵煎嚭鍩虹棰滆壊
   blue: $blue;
   lightBlue: $light-blue;
   red: $red;
@@ -57,7 +57,7 @@ $--color-info: #909399;
   tiffany: $tiffany;
   yellow: $yellow;
   panGreen: $panGreen;
-  // 导出组件颜色
+  // 瀵煎嚭缁勪欢棰滆壊
   colorPrimary: $--color-primary;
   colorSuccess: $--color-success;
   colorWarning: $--color-warning;
@@ -65,24 +65,25 @@ $--color-info: #909399;
   colorInfo: $--color-info;
 }
 
-// CSS变量定义
+// CSS鍙橀噺瀹氫箟
 :root {
-  /* 亮色模式变量 */
+  /* 浜壊妯″紡鍙橀噺 */
   --sidebar-bg: #{$menuBg};
   --sidebar-text: #{$menuText};
   --menu-hover: #{$menuHover};
+  --menu-active-text: #{$menuActiveText};
   
   --navbar-bg: #ffffff;
   --navbar-text: #303133;
   
-  /* splitpanes default-theme 变量 */
+  /* splitpanes default-theme 鍙橀噺 */
   --splitpanes-default-bg: #ffffff;
 
 }
 
-// 暗黑模式变量
+// 鏆楅粦妯″紡鍙橀噺
 html.dark {
-  /* 默认通用 */
+  /* 榛樿閫氱敤 */
   --el-bg-color: #141414;
   --el-bg-color-overlay: #1d1e1f;
   --el-text-color-primary: #ffffff;
@@ -90,18 +91,18 @@ html.dark {
   --el-border-color: #434343;
   --el-border-color-light: #434343;
 
-  /* 侧边栏 */
+  /* 渚ц竟鏍?*/
   --sidebar-bg: #141414;
   --sidebar-text: #ffffff;
   --menu-hover: #2d2d2d;
   --menu-active-text: #{$menuActiveText};
 
-  /* 顶部导航栏 */
+  /* 椤堕儴瀵艰埅鏍?*/
   --navbar-bg: #141414;
   --navbar-text: #ffffff;
   --navbar-hover: #141414;
 
-  /* 标签栏 */
+  /* 鏍囩鏍?*/
   --tags-bg: #141414;
   --tags-item-bg: #1d1e1f;
   --tags-item-border: #303030;
@@ -109,24 +110,24 @@ html.dark {
   --tags-item-hover: #2d2d2d;
   --tags-close-hover: #64666a;
 
-  /* splitpanes 组件暗黑模式变量 */
+  /* splitpanes 缁勪欢鏆楅粦妯″紡鍙橀噺 */
   --splitpanes-bg: #141414;
   --splitpanes-border: #303030;
   --splitpanes-splitter-bg: #1d1e1f;
   --splitpanes-splitter-hover-bg: #2d2d2d;
 
-  /* blockquote 暗黑模式变量 */
+  /* blockquote 鏆楅粦妯″紡鍙橀噺 */
   --blockquote-bg: #1d1e1f;
   --blockquote-border: #303030;
   --blockquote-text: #d0d0d0;
   
-  /* Cron 时间表达式 模式变量 */
+  /* Cron 鏃堕棿琛ㄨ揪寮?妯″紡鍙橀噺 */
   --cron-border: #303030;
 
-  /* splitpanes default-theme 暗黑模式变量 */
+  /* splitpanes default-theme 鏆楅粦妯″紡鍙橀噺 */
   --splitpanes-default-bg: #141414;
 
-  /* 侧边栏菜单覆盖 */
+  /* 渚ц竟鏍忚彍鍗曡鐩?*/
    .sidebar-container {
     .el-menu-item, .menu-title {
       color: var(--el-text-color-regular);
@@ -137,7 +138,7 @@ html.dark {
     }
   }
 
-  /* 顶部栏栏菜单覆盖 */
+  /* 椤堕儴鏍忔爮鑿滃崟瑕嗙洊 */
   .el-menu--horizontal {
     .el-menu-item {
       &:not(.is-disabled) {
@@ -149,7 +150,7 @@ html.dark {
     }
   }
 
-  /* 分割窗格覆盖 */
+  /* 鍒嗗壊绐楁牸瑕嗙洊 */
   .splitpanes {
     background-color: var(--splitpanes-bg);
 
@@ -173,7 +174,7 @@ html.dark {
     }
   }
 
-  /* 表格样式覆盖 */
+  /* 琛ㄦ牸鏍峰紡瑕嗙洊 */
   .el-table {
     --el-table-header-bg-color: var(--el-bg-color-overlay) !important;
     --el-table-header-text-color: var(--el-text-color-regular) !important;
@@ -188,7 +189,7 @@ html.dark {
     }
   }
 
-  /* 树组件高亮样式覆盖 */
+  /* 鏍戠粍浠堕珮浜牱寮忚鐩?*/
   .el-tree {
     .el-tree-node.is-current > .el-tree-node__content {
       background-color: var(--el-bg-color-overlay) !important;
@@ -200,22 +201,24 @@ html.dark {
     }
   }
   
-  /* 下拉菜单样式覆盖 */
+  /* 涓嬫媺鑿滃崟鏍峰紡瑕嗙洊 */
   .el-dropdown-menu__item:not(.is-disabled):focus, .el-dropdown-menu__item:not(.is-disabled):hover{
     background-color: var(--navbar-hover) !important;
   }
 
-  /* blockquote样式覆盖 */
+  /* blockquote鏍峰紡瑕嗙洊 */
   blockquote {
     background-color: var(--blockquote-bg) !important;
     border-left-color: var(--blockquote-border) !important;
     color: var(--blockquote-text) !important;
   }
   
-  /* 时间表达式标题样式覆盖 */
+  /* 鏃堕棿琛ㄨ揪寮忔爣棰樻牱寮忚鐩?*/
   .popup-result .title {
     background: var(--cron-border);
   }
 
 }
+
+
 

@@ -6,6 +6,7 @@
 @use './ruoyi.scss';
 @use './portal-theme.scss';
 @use './system-modern.scss';
+@use './design-system.scss';
 
 body {
   height: 100%;
@@ -122,9 +123,9 @@ aside {
   }
 }
 
-//main-container鍏ㄥ眬鏍峰紡
+// main container global spacing
 .app-container {
-  padding: 0;
+  padding: 24px;
 }
 
 .components-container {
@@ -144,7 +145,7 @@ aside {
   text-align: right;
   padding-right: 20px;
   transition: 600ms ease position;
-  background: linear-gradient(90deg, rgba(32, 182, 249, 1) 0%, rgba(32, 182, 249, 1) 0%, rgba(33, 120, 241, 1) 100%, rgba(33, 120, 241, 1) 100%);
+  background: #2563eb;
 
   .subtitle {
     font-size: 20px;

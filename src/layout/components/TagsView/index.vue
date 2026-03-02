@@ -264,8 +264,8 @@ function handleScroll() {
   height: 34px;
   width: 100%;
   background: var(--tags-bg, #fff);
-  border-bottom: 1px solid var(--tags-item-border, #d8dce5);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .12), 0 0 3px 0 rgba(0, 0, 0, .04);
+  border-bottom: 1px solid var(--tags-item-border, #e5e7eb);
+  box-shadow: none;
 
   .tags-view-wrapper {
     .tags-view-item {
@@ -291,19 +291,12 @@ function handleScroll() {
       }
 
       &.active {
-        background-color: #42b983;
-        color: #fff;
-        border-color: #42b983;
+        background-color: rgb(37 99 235 / 0.08);
+        color: #2563eb;
+        border-color: #bfdbfe;
 
         &::before {
-          content: '';
-          background: #fff;
-          display: inline-block;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          position: relative;
-          margin-right: 5px;
+          display: none;
         }
       }
     }

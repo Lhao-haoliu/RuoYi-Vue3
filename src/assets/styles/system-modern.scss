@@ -1,5 +1,5 @@
 ﻿.page-container {
-  background: #f7f9fc;
+  background: #f9fafb;
   min-height: calc(100vh - 84px);
   padding: 24px;
 }
@@ -12,7 +12,7 @@
 }
 
 .page-container__title {
-  color: #2e3a59;
+  color: #111827;
   font-size: 20px;
   font-weight: 600;
   line-height: 1.4;
@@ -20,7 +20,7 @@
 }
 
 .page-container__desc {
-  color: #6b778c;
+  color: #4b5563;
   font-size: 14px;
   line-height: 1.6;
   margin: 6px 0 0;
@@ -35,8 +35,9 @@
 .page-container__search-card,
 .page-container__table-card {
   background: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(15, 31, 61, 0.06);
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: none;
 }
 
 .page-container__search-card {
@@ -75,7 +76,7 @@
   }
 
   .el-form-item__label {
-    color: #2e3a59;
+    color: #111827;
     font-size: 14px;
     font-weight: 500;
   }
@@ -90,21 +91,23 @@
   }
 
   .el-table {
-    --el-table-row-height: 48px;
-    --el-table-header-bg-color: #f7f9fc;
-    --el-table-border-color: #eef1f7;
+    --el-table-row-height: 52px;
+    --el-table-header-bg-color: #f9fafb;
+    --el-table-header-text-color: #4b5563;
+    --el-table-border-color: #e5e7eb;
     --el-table-border: none;
     font-size: 14px;
   }
 
   .el-table td,
   .el-table th {
-    border-bottom-color: #eef1f7;
+    border-bottom-color: #e5e7eb;
+    border-right: none !important;
     padding: 12px 0;
   }
 
   .el-table__body tr:hover > td {
-    background-color: #f5f8ff !important;
+    background-color: #eff6ff !important;
   }
 
   .operation-text-btn + .operation-text-btn {
@@ -125,8 +128,8 @@
   }
 
   .el-button--primary:not(.is-link):not(.is-text):not(.is-plain) {
-    background: linear-gradient(90deg, #4a90e2 0%, #6c5dd3 100%);
-    border: none;
+    background: #2563eb;
+    border: 1px solid #2563eb;
     color: #fff;
   }
 
@@ -140,13 +143,13 @@
   .el-button.is-link.el-button--info {
     background: transparent;
     border: none;
-    color: #4a90e2;
+    color: #2563eb;
   }
 
   .el-button.is-link.el-button--danger {
     background: transparent;
     border: none;
-    color: #eb5757;
+    color: #ef4444;
   }
 
   .el-button--default,
@@ -154,13 +157,13 @@
   .el-button--success.is-plain,
   .el-button--warning.is-plain,
   .el-button--info.is-plain {
-    border-color: #4a90e2;
-    color: #4a90e2;
+    border-color: #2563eb;
+    color: #2563eb;
   }
 
   .el-button--danger,
   .el-button--danger.is-plain {
-    border-color: #eb5757;
-    color: #eb5757;
+    border-color: #ef4444;
+    color: #ef4444;
   }
 }

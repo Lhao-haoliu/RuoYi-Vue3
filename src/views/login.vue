@@ -129,19 +129,21 @@ getCookie()
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 24px;
-  background:
-    radial-gradient(circle at 12% 15%, rgba(74, 144, 226, 0.34), transparent 38%),
-    radial-gradient(circle at 82% 20%, rgba(108, 93, 211, 0.28), transparent 32%),
-    linear-gradient(160deg, #0f1f3d 0%, #132d57 55%, #1b3f77 100%);
+  padding: 24px 16px;
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(to right, rgba(156, 163, 175, 0.15) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(156, 163, 175, 0.15) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
 .login-panel {
   width: min(440px, 100%);
   padding: 30px 28px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 22px 44px rgba(8, 22, 48, 0.35);
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: none;
 }
 
 .login-brand {
@@ -155,11 +157,11 @@ getCookie()
   h2 {
     margin: 10px 0 6px;
     font-size: 22px;
-    color: #0f1f3d;
+    color: #111827;
   }
   p {
     margin: 0;
-    color: #657291;
+    color: #9ca3af;
     font-size: 13px;
   }
 }
@@ -175,11 +177,11 @@ getCookie()
 
 .login-code-img {
   width: 116px;
-  height: 40px;
+  height: 42px;
   margin-left: 12px;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  border: 1px solid #d7e2f2;
+  border: 1px solid #e5e7eb;
 }
 
 .login-row {
@@ -190,12 +192,35 @@ getCookie()
 }
 
 .register-link {
-  color: #4a90e2;
+  color: #2563eb;
   font-size: 13px;
 }
 
 .submit-btn {
   width: 100%;
+}
+
+.login-form {
+  :deep(.el-form-item) {
+    margin-bottom: 16px;
+  }
+
+  :deep(.el-input__wrapper) {
+    min-height: 42px;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    background: #f3f4f6;
+    box-shadow: none;
+  }
+
+  :deep(.el-input__wrapper.is-focus) {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 1px rgb(37 99 235 / 0.2);
+  }
+
+  :deep(.el-input__inner) {
+    color: #111827;
+  }
 }
 </style>
 

@@ -1,15 +1,15 @@
-:root {
-  --portal-primary-deep: #0f1f3d;
-  --portal-bg-main: #f7f9fc;
+﻿:root {
+  --portal-primary-deep: #111827;
+  --portal-bg-main: #f9fafb;
   --portal-bg-card: #ffffff;
-  --portal-accent-a: #4a90e2;
-  --portal-accent-b: #6c5dd3;
-  --portal-text-main: #2e3a59;
-  --portal-text-sub: #5e6a84;
-  --portal-success: #27ae60;
-  --portal-warning: #f2c94c;
-  --portal-danger: #eb5757;
-  --portal-border: #e8edf6;
+  --portal-accent-a: #2563eb;
+  --portal-accent-b: #2563eb;
+  --portal-text-main: #111827;
+  --portal-text-sub: #4b5563;
+  --portal-success: #10b981;
+  --portal-warning: #f59e0b;
+  --portal-danger: #ef4444;
+  --portal-border: #e5e7eb;
 }
 
 body {
@@ -17,38 +17,46 @@ body {
   background: var(--portal-bg-main);
 }
 
-h1, h2, h3 {
+h1,
+h2,
+h3 {
   font-weight: 600;
 }
 
 .portal-card {
   background: var(--portal-bg-card);
   border: 1px solid var(--portal-border);
-  border-radius: 14px;
+  border-radius: 6px;
   padding: 16px;
-  box-shadow: 0 8px 24px rgba(16, 31, 61, 0.05);
+  box-shadow: none;
 }
 
 .portal-primary-btn.el-button {
-  border: none;
+  border: 1px solid var(--portal-accent-a);
   color: #fff;
-  background: linear-gradient(90deg, var(--portal-accent-a), var(--portal-accent-b));
+  background: var(--portal-accent-a);
+}
+
+.portal-primary-btn.el-button:hover {
+  opacity: 0.9;
 }
 
 .portal-primary-btn.el-button.is-disabled,
 .portal-primary-btn.el-button:disabled {
-  background: #cfd8ea;
+  background: #bfdbfe;
+  border-color: #bfdbfe;
   color: #ffffff;
 }
 
 .portal-secondary-btn.el-button {
-  border: 1px solid #cbd7ec;
+  border: 1px solid #bfdbfe;
   color: var(--portal-accent-a);
-  background: #fff;
+  background: #eff6ff;
 }
 
 .portal-secondary-btn.el-button.is-disabled,
 .portal-secondary-btn.el-button:disabled {
-  color: #9cadca;
-  border-color: #e0e8f7;
+  color: #93c5fd;
+  border-color: #dbeafe;
+  background: #eff6ff;
 }

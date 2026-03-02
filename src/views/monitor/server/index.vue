@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container">
+  <div class="app-container monitor-industrial">
     <el-row :gutter="10">
       <el-col :span="12" class="card-box">
         <el-card>
@@ -185,3 +185,13 @@ function getList() {
 
 getList()
 </script>
+
+<style scoped lang="scss">
+.monitor-industrial {
+  .el-card {
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    box-shadow: none;
+  }
+}
+</style>

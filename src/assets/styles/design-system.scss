@@ -1,0 +1,271 @@
+:root {
+  --saas-bg: #f9fafb;
+  --saas-surface: #ffffff;
+  --saas-primary: #2563eb;
+  --saas-text-title: #111827;
+  --saas-text-body: #4b5563;
+  --saas-text-muted: #9ca3af;
+  --saas-success: #10b981;
+  --saas-warning: #f59e0b;
+  --saas-danger: #ef4444;
+  --saas-border: #e5e7eb;
+  --saas-hover-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --saas-radius: 6px;
+
+  --el-color-primary: var(--saas-primary);
+  --el-color-success: var(--saas-success);
+  --el-color-warning: var(--saas-warning);
+  --el-color-danger: var(--saas-danger);
+  --el-color-error: var(--saas-danger);
+  --el-color-info: #6b7280;
+  --el-text-color-primary: var(--saas-text-title);
+  --el-text-color-regular: var(--saas-text-body);
+  --el-text-color-secondary: #6b7280;
+  --el-text-color-placeholder: var(--saas-text-muted);
+  --el-border-color: var(--saas-border);
+  --el-border-color-light: var(--saas-border);
+  --el-border-color-lighter: #eef0f3;
+  --el-fill-color-light: #f3f4f6;
+  --el-fill-color-blank: var(--saas-surface);
+  --el-bg-color: var(--saas-surface);
+  --el-bg-color-page: var(--saas-bg);
+  --el-bg-color-overlay: var(--saas-surface);
+  --el-border-radius-base: var(--saas-radius);
+  --el-border-radius-small: var(--saas-radius);
+  --el-border-radius-round: 999px;
+  --el-box-shadow-light: var(--saas-hover-shadow);
+}
+
+html,
+body,
+#app {
+  background: var(--saas-bg);
+  color: var(--saas-text-body);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--saas-text-title);
+}
+
+.app-container,
+.page-container {
+  background: var(--saas-bg);
+}
+
+.portal-card,
+.el-card,
+.page-container__search-card,
+.page-container__table-card,
+.el-dialog,
+.el-popover {
+  background: var(--saas-surface);
+  border: 1px solid var(--saas-border);
+  border-radius: var(--saas-radius);
+  box-shadow: none;
+}
+
+.portal-card:hover,
+.el-card:hover {
+  box-shadow: var(--saas-hover-shadow);
+}
+
+.el-button,
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner,
+.el-menu-item,
+.el-sub-menu__title,
+.el-table__body tr > td {
+  transition: all 0.2s ease-in-out;
+}
+
+.el-button {
+  border-radius: var(--saas-radius);
+  border-color: var(--saas-border);
+}
+
+.el-button--primary {
+  color: #ffffff;
+  background: var(--saas-primary);
+  border-color: var(--saas-primary);
+}
+
+.el-button--primary:hover,
+.el-button--primary:focus-visible {
+  opacity: 0.9;
+}
+
+.el-button--primary.is-disabled,
+.el-button--primary:disabled {
+  opacity: 0.6;
+}
+
+.portal-primary-btn.el-button {
+  color: #ffffff;
+  background: var(--saas-primary);
+  border: 1px solid var(--saas-primary);
+}
+
+.portal-primary-btn.el-button:hover {
+  opacity: 0.9;
+}
+
+.portal-secondary-btn.el-button {
+  color: var(--saas-primary);
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+}
+
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  border: 1px solid var(--saas-border);
+  border-radius: var(--saas-radius);
+  box-shadow: none !important;
+  background: var(--saas-surface);
+}
+
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus {
+  border-color: var(--saas-primary);
+  box-shadow: 0 0 0 1px rgb(37 99 235 / 0.2) !important;
+}
+
+.el-table {
+  --el-table-header-bg-color: var(--saas-bg);
+  --el-table-header-text-color: var(--saas-text-body);
+  --el-table-border-color: var(--saas-border);
+  --el-table-row-hover-bg-color: #eff6ff;
+  border: 1px solid var(--saas-border);
+  border-radius: var(--saas-radius);
+}
+
+.el-table th.el-table__cell,
+.el-table td.el-table__cell {
+  border-right: none !important;
+  border-bottom: 1px solid var(--saas-border);
+  height: 52px;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 700;
+  color: var(--saas-text-body);
+  background: var(--saas-bg);
+}
+
+.el-table .el-table__body tr:hover > td {
+  background: #eff6ff !important;
+}
+
+.el-table--border::before,
+.el-table--border::after,
+.el-table__inner-wrapper::before {
+  display: none;
+}
+
+.el-tag {
+  border: none;
+  border-radius: 999px;
+  font-weight: 600;
+  padding: 2px 10px;
+}
+
+.el-tag--success {
+  color: #065f46;
+  background: #d1fae5;
+}
+
+.el-tag--warning {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.el-tag--danger {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.el-tag--info {
+  color: #374151;
+  background: #e5e7eb;
+}
+
+#app .sidebar-container {
+  background: var(--saas-surface) !important;
+  border-right: 1px solid var(--saas-border);
+  box-shadow: none !important;
+}
+
+#app .sidebar-container .el-menu {
+  background: transparent !important;
+}
+
+#app .sidebar-container .el-menu-item,
+#app .sidebar-container .el-sub-menu__title {
+  color: var(--saas-text-body) !important;
+  position: relative;
+}
+
+#app .sidebar-container .el-menu-item:hover,
+#app .sidebar-container .el-sub-menu__title:hover {
+  color: var(--saas-primary) !important;
+  background: rgb(37 99 235 / 0.04) !important;
+}
+
+#app .sidebar-container .el-menu-item.is-active {
+  color: var(--saas-primary) !important;
+  background: rgb(37 99 235 / 0.06) !important;
+  font-weight: 600;
+}
+
+#app .sidebar-container .el-menu-item.is-active::before,
+#app .sidebar-container .el-sub-menu.is-active > .el-sub-menu__title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--saas-primary);
+}
+
+.navbar {
+  background: var(--saas-surface) !important;
+  border-bottom: 1px solid var(--saas-border);
+  box-shadow: none !important;
+}
+
+.tags-view-container {
+  background: var(--saas-surface) !important;
+  border-bottom: 1px solid var(--saas-border) !important;
+  box-shadow: none !important;
+}
+
+.tags-view-wrapper .tags-view-item.active {
+  color: var(--saas-primary) !important;
+  background: rgb(37 99 235 / 0.08) !important;
+  border-color: #bfdbfe !important;
+}
+
+.tags-view-wrapper .tags-view-item.active::before {
+  display: none !important;
+}
+
+.page-container {
+  padding: 24px;
+}
+
+.page-container__search-card {
+  padding: 18px;
+}
+
+.page-container__table-card {
+  padding: 18px;
+}

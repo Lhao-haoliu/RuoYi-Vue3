@@ -86,9 +86,10 @@
   .el-table__header-wrapper, .el-table__fixed-header-wrapper {
     th {
       word-break: break-word;
-      background-color: #f8f8f9 !important;
-      color: #515a6e;
-      height: 40px !important;
+      background-color: #f9fafb !important;
+      color: #4b5563;
+      font-weight: 700;
+      height: 52px !important;
       font-size: 13px;
     }
   }
@@ -252,7 +253,7 @@
 }
 
 .text-success {
-  color: #1c84c6;
+  color: #10b981;
 }
 
 .text-info {
@@ -260,15 +261,15 @@
 }
 
 .text-warning {
-  color: #f8ac59;
+  color: #f59e0b;
 }
 
 .text-danger {
-  color: #ed5565;
+  color: #ef4444;
 }
 
 .text-muted {
-  color: #888888;
+  color: #9ca3af;
 }
 
 /* image */

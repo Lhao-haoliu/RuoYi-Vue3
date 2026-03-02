@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="portal-dashboard">
     <section class="portal-banner portal-card">
       <div>
@@ -10,12 +10,9 @@
 
     <section class="portal-grid kpi-grid">
       <article class="portal-card kpi-card" v-for="item in dashboard.overview" :key="item.label">
-        <header class="card-header">
-          <el-icon><DataLine /></el-icon>
-          <span>{{ item.label }}</span>
-        </header>
+        <header class="kpi-label">{{ item.label }}</header>
         <div class="kpi-number">{{ item.value }}</div>
-        <div class="kpi-trend">{{ item.trend }}</div>
+        <div class="kpi-trend" :class="trendClass(item.trend)">{{ item.trend }}</div>
       </article>
     </section>
 
@@ -29,8 +26,8 @@
         <div class="status-list">
           <div class="status-row" v-for="row in dashboard.statusDistribution" :key="row.name">
             <label>{{ row.name }}</label>
-            <div class="status-bar">
-              <span :style="{ width: `${row.value}%`, background: row.color }"></span>
+            <div class="status-bar" :style="{ background: statusTrackColor(row.name) }">
+              <span :style="{ width: `${row.value}%`, background: statusColor(row.name) }"></span>
             </div>
             <strong>{{ row.value }}%</strong>
           </div>
@@ -73,7 +70,7 @@
 </template>
 
 <script setup>
-import { DataLine, PieChart, Warning, Grid } from '@element-plus/icons-vue'
+import { PieChart, Warning, Grid } from '@element-plus/icons-vue'
 import useUserStore from '@/store/modules/user'
 import dashboard from '@/mock/dashboard.json'
 import quickMenu from '@/mock/menu.json'
@@ -89,12 +86,34 @@ function tagType(level) {
   if (level === 'Error') return 'danger'
   return 'info'
 }
+
+function trendClass(trend) {
+  const value = String(trend || '').trim()
+  if (value.startsWith('-')) {
+    return 'is-negative'
+  }
+  return 'is-positive'
+}
+
+function statusColor(status) {
+  if (status === 'Success') return '#10B981'
+  if (status === 'Warning') return '#F59E0B'
+  if (status === 'Error') return '#EF4444'
+  return '#2563EB'
+}
+
+function statusTrackColor(status) {
+  if (status === 'Success') return 'rgb(16 185 129 / 0.1)'
+  if (status === 'Warning') return 'rgb(245 158 11 / 0.1)'
+  if (status === 'Error') return 'rgb(239 68 68 / 0.1)'
+  return 'rgb(37 99 235 / 0.1)'
+}
 </script>
 
 <style scoped lang="scss">
 .portal-dashboard {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
 .portal-banner {
@@ -102,14 +121,16 @@ function tagType(level) {
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   h2 {
     margin: 0 0 8px;
-    font-size: 28px;
-    color: #0f1f3d;
+    font-size: 30px;
+    color: #111827;
   }
+
   p {
     margin: 0;
-    color: #54617d;
+    color: #4b5563;
     font-size: 14px;
   }
 }
@@ -132,25 +153,41 @@ function tagType(level) {
   align-items: center;
   gap: 8px;
   margin-bottom: 14px;
-  color: #2e3a59;
+  color: #111827;
   font-weight: 500;
   font-size: 14px;
+
   .el-button {
     margin-left: auto;
   }
 }
 
+.kpi-label {
+  margin-bottom: 10px;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .kpi-number {
-  font-size: 32px;
+  font-size: 24px;
   font-weight: 700;
   line-height: 1.2;
-  color: #2e3a59;
+  color: #111827;
 }
 
 .kpi-trend {
-  margin-top: 4px;
+  margin-top: 8px;
   font-size: 13px;
-  color: #4a90e2;
+  font-weight: 600;
+}
+
+.kpi-trend.is-positive {
+  color: #10b981;
+}
+
+.kpi-trend.is-negative {
+  color: #ef4444;
 }
 
 .status-list {
@@ -163,22 +200,24 @@ function tagType(level) {
   grid-template-columns: 72px 1fr 46px;
   align-items: center;
   gap: 8px;
+
   label {
-    color: #55627f;
+    color: #4b5563;
     font-size: 13px;
   }
+
   strong {
-    color: #2e3a59;
+    color: #111827;
     font-size: 13px;
   }
 }
 
 .status-bar {
   width: 100%;
-  height: 10px;
+  height: 8px;
   border-radius: 999px;
-  background: #edf2fa;
   overflow: hidden;
+
   span {
     display: block;
     height: 100%;
@@ -196,18 +235,18 @@ function tagType(level) {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border: 1px solid #ecf0f7;
-  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
 }
 
 .event-time {
-  color: #6f7c97;
+  color: #9ca3af;
   font-size: 13px;
 }
 
 .event-title {
   font-size: 13px;
-  color: #2e3a59;
+  color: #111827;
 }
 
 .quick-actions {
@@ -224,6 +263,7 @@ function tagType(level) {
   .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
   .content-grid {
     grid-template-columns: 1fr;
   }
