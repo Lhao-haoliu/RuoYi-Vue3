@@ -1,0 +1,9 @@
+<svg width="320" height="96" viewBox="0 0 320 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="semiBlue" x1="18" y1="12" x2="290" y2="88" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5368C7"/>
+      <stop offset="1" stop-color="#3A56B8"/>
+    </linearGradient>
+  </defs>
+  <text x="10" y="68" font-size="74" font-weight="800" font-family="Segoe UI, Arial, sans-serif" letter-spacing="3" fill="url(#semiBlue)">SEMI</text>
+</svg>

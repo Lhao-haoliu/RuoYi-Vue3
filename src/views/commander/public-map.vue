@@ -1,6 +1,10 @@
-<template>
+﻿<template>
   <div class="app-container">
     <h2>公版图管理</h2>
+    <div class="mb8">
+      <el-button type="primary" v-hasPermi="['commander:map:mockPublish']" @click="mockPublish">模拟发布公版图</el-button>
+      <el-button type="danger" plain v-hasPermi="['commander:map:mockDisable']" @click="mockDisable">模拟作废版本</el-button>
+    </div>
     <el-table :data="mockPublicMaps" border>
       <el-table-column prop="id" label="ID" width="100" />
       <el-table-column prop="name" label="名称" />
@@ -11,7 +15,16 @@
 </template>
 
 <script setup>
-import portalData from '@/mock/portal-data.json'
+import { ElMessage } from "element-plus"
+import portalData from "@/mock/portal-data.json"
 
-const mockPublicMaps = portalData.publicMaps
+const mockPublicMaps = portalData.publicMaps || []
+
+function mockPublish() {
+  ElMessage.success("模拟发布成功（仅前端）")
+}
+
+function mockDisable() {
+  ElMessage.warning("模拟作废成功（仅前端）")
+}
 </script>

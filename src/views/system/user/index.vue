@@ -591,8 +591,13 @@ onMounted(() => {
 }
 
 .operation-text-btn {
+  align-items: center;
   color: #4a90e2;
   cursor: pointer;
+  display: inline-flex;
   font-size: 14px;
+  height: 24px;
+  line-height: 24px;
+  vertical-align: middle;
 }
 </style>

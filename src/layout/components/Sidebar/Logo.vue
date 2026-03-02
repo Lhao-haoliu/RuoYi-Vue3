@@ -14,7 +14,7 @@
 </template>
 
 <script setup>
-import logo from '@/assets/logo/logo.png'
+import logo from '@/assets/logo/company-logo.svg'
 import useSettingsStore from '@/store/modules/settings'
 import variables from '@/assets/styles/variables.module.scss'
 
@@ -75,8 +75,9 @@ const getLogoTextColor = computed(() => {
     width: 100%;
 
     & .sidebar-logo {
-      width: 32px;
-      height: 32px;
+      width: 90px;
+      height: 28px;
+      object-fit: contain;
       vertical-align: middle;
       margin-right: 12px;
     }

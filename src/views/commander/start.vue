@@ -1,6 +1,10 @@
-<template>
+﻿<template>
   <div class="app-container">
     <h2>任务启动</h2>
+    <div class="mb8">
+      <el-button type="primary" v-hasPermi="['commander:start:mockRun']" @click="mockStart">模拟启动任务</el-button>
+      <el-button v-hasPermi="['commander:start:mockStop']" @click="mockStop">模拟停止任务</el-button>
+    </div>
     <el-table :data="mockStartItems" border>
       <el-table-column prop="id" label="ID" width="100" />
       <el-table-column prop="name" label="任务名称" />
@@ -11,7 +15,16 @@
 </template>
 
 <script setup>
-import portalData from '@/mock/portal-data.json'
+import { ElMessage } from "element-plus"
+import portalData from "@/mock/portal-data.json"
 
-const mockStartItems = portalData.startItems
+const mockStartItems = portalData.startItems || []
+
+function mockStart() {
+  ElMessage.success("模拟启动成功（仅前端）")
+}
+
+function mockStop() {
+  ElMessage.warning("模拟停止成功（仅前端）")
+}
 </script>

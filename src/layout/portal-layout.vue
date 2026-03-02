@@ -2,16 +2,16 @@
   <div class="portal-shell">
     <aside class="portal-sidebar">
       <div class="portal-brand">
-        <img :src="portalLogo" alt="Portal" />
+        <img :src="portalLogo" alt="SEMI Logo" />
         <div class="portal-brand-text">
-          <h1>系统门户</h1>
-          <p>企业控制台</p>
+          <h1>eRPA</h1>
+          <p>SEMI控制台</p>
         </div>
       </div>
       <el-scrollbar class="portal-menu-scroll">
         <el-menu
           :default-active="activePath"
-          :collapse="!appStore.sidebar.opened"
+          :collapse="false"
           :unique-opened="true"
           :collapse-transition="false"
           background-color="transparent"
@@ -32,7 +32,6 @@
     <section class="portal-main">
       <header class="portal-topbar">
         <div class="topbar-left">
-          <el-button class="portal-secondary-btn" @click="appStore.toggleSideBar(false)">菜单</el-button>
           <el-input v-model="searchKey" class="portal-search" placeholder="全局搜索模块..." clearable />
         </div>
         <div class="topbar-right">
@@ -65,15 +64,13 @@
 
 <script setup>
 import { Bell } from '@element-plus/icons-vue'
-import useAppStore from '@/store/modules/app'
 import useUserStore from '@/store/modules/user'
 import usePermissionStore from '@/store/modules/permission'
 import PortalNavItem from '@/layout/components/portal/PortalNavItem.vue'
-import portalLogo from '@/assets/logo/portal-logo.svg'
+import portalLogo from '@/assets/logo/company-logo.svg'
 
 const router = useRouter()
 const route = useRoute()
-const appStore = useAppStore()
 const userStore = useUserStore()
 const permissionStore = usePermissionStore()
 
@@ -121,6 +118,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 264px 1fr;
   background: #f7f9fc;
+  transition: grid-template-columns 0.2s ease;
 }
 
 .portal-sidebar {
@@ -138,8 +136,12 @@ onBeforeUnmount(() => {
   padding: 0 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.09);
   img {
-    width: 36px;
-    height: 36px;
+    width: 104px;
+    height: 30px;
+    object-fit: contain;
+  }
+  .portal-brand-text {
+    overflow: hidden;
   }
   h1 {
     margin: 0;

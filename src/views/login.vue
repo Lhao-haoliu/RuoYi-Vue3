@@ -2,9 +2,9 @@
   <div class="portal-login">
     <div class="login-panel">
       <div class="login-brand">
-        <img :src="portalLogo" alt="Portal" />
+        <img :src="portalLogo" alt="SEMI Logo" />
         <h2>{{ title }}</h2>
-        <p>企业智能平台</p>
+        <p>SEMI控制台</p>
       </div>
       <el-form ref="loginRef" :model="loginForm" :rules="loginRules" class="login-form">
         <el-form-item prop="username">
@@ -40,7 +40,7 @@ import { getCodeImg } from "@/api/login"
 import Cookies from "js-cookie"
 import { encrypt, decrypt } from "@/utils/jsencrypt"
 import useUserStore from '@/store/modules/user'
-import portalLogo from '@/assets/logo/portal-logo.svg'
+import portalLogo from '@/assets/logo/company-logo.svg'
 
 const title = import.meta.env.VITE_APP_TITLE
 const userStore = useUserStore()
@@ -148,8 +148,9 @@ getCookie()
   text-align: center;
   margin-bottom: 20px;
   img {
-    width: 46px;
-    height: 46px;
+    width: 120px;
+    height: 36px;
+    object-fit: contain;
   }
   h2 {
     margin: 10px 0 6px;
