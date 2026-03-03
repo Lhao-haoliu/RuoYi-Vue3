@@ -11,14 +11,14 @@
     <section class="hero-card">
       <div>
         <p class="eyebrow">Excel Files</p>
-        <h1>在线Excel文件管理</h1>
+        <h1>在线 Excel 文件管理</h1>
         <p class="hero-desc">
-          这里专门查看所有已上传文件。上传后会进入列表，你可以明确选择要编辑的那一份，再进入在线 Excel 编辑页。
+          这里用于管理已上传文件。若文件被他人锁定，将显示锁状态且禁止进入编辑。
         </p>
       </div>
       <div class="hero-actions">
         <el-button :loading="loading" @click="refreshStorageInfo">刷新列表</el-button>
-        <el-button type="primary" :loading="uploading" @click="triggerUpload">上传Excel</el-button>
+        <el-button type="primary" :loading="uploading" @click="triggerUpload">上传 Excel</el-button>
       </div>
     </section>
 
@@ -29,9 +29,9 @@
         <span>按最近修改时间排序</span>
       </article>
       <article class="summary-card">
-        <span class="summary-label">当前后端文件</span>
+        <span class="summary-label">当前默认文件</span>
         <strong>{{ currentFileName || '未指定' }}</strong>
-        <span>打开编辑时默认读取这一份</span>
+        <span>进入编辑页时默认读取该文件</span>
       </article>
     </section>
 
@@ -48,16 +48,30 @@
             {{ formatTime(row.lastModified) }}
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="140">
+        <el-table-column label="锁状态" min-width="220">
+          <template #default="{ row }">
+            <el-tag :type="getLockTagType(row.fileName)" effect="light">
+              {{ getLockLabel(row.fileName) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="标记" width="140">
           <template #default="{ row }">
             <el-tag :type="row.fileName === currentFileName ? 'success' : 'info'" effect="light">
-              {{ row.fileName === currentFileName ? '当前文件' : '可编辑' }}
+              {{ row.fileName === currentFileName ? '当前文件' : '普通文件' }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openEditor(row.fileName)">编辑此文件</el-button>
+            <el-button
+              link
+              type="primary"
+              :disabled="isLockedByOthers(row.fileName)"
+              @click="openEditor(row.fileName)"
+            >
+              编辑此文件
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -74,7 +88,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getExcelEditorInfo, uploadExcelEditorFile } from '@/api/tool/excelEditor'
+import { getExcelEditorInfo, getExcelEditorLockStatus, uploadExcelEditorFile } from '@/api/tool/excelEditor'
 
 const router = useRouter()
 
@@ -83,6 +97,7 @@ const loading = ref(false)
 const uploading = ref(false)
 const uploadedFiles = ref([])
 const currentFileName = ref('')
+const lockStatusMap = ref({})
 
 onMounted(async () => {
   await refreshStorageInfo()
@@ -94,11 +109,30 @@ async function refreshStorageInfo() {
     const response = await getExcelEditorInfo()
     uploadedFiles.value = Array.isArray(response?.data?.files) ? response.data.files : []
     currentFileName.value = response?.data?.currentFileName || ''
+    await refreshLockStatuses(uploadedFiles.value)
   } catch (error) {
     ElMessage.error(error?.message || '读取文件列表失败')
   } finally {
     loading.value = false
   }
+}
+
+async function refreshLockStatuses(files) {
+  const nextMap = {}
+  const tasks = (Array.isArray(files) ? files : []).map(async (item) => {
+    const fileName = item?.fileName
+    if (!fileName) {
+      return
+    }
+    try {
+      const response = await getExcelEditorLockStatus(fileName)
+      nextMap[fileName] = response?.data || {}
+    } catch {
+      nextMap[fileName] = {}
+    }
+  })
+  await Promise.all(tasks)
+  lockStatusMap.value = nextMap
 }
 
 function triggerUpload() {
@@ -127,9 +161,43 @@ async function handleFileSelect(event) {
   }
 }
 
+function isLockedByOthers(fileName) {
+  const lockInfo = lockStatusMap.value[fileName] || {}
+  return Boolean(lockInfo.locked) && !Boolean(lockInfo.self)
+}
+
+function getLockLabel(fileName) {
+  const lockInfo = lockStatusMap.value[fileName] || {}
+  if (Boolean(lockInfo.locked) && Boolean(lockInfo.self)) {
+    return '我正在编辑'
+  }
+  if (Boolean(lockInfo.locked) && lockInfo.ownerUsername) {
+    return `被 ${lockInfo.ownerUsername} 锁定`
+  }
+  if (Boolean(lockInfo.locked)) {
+    return '已锁定'
+  }
+  return '未锁定'
+}
+
+function getLockTagType(fileName) {
+  const lockInfo = lockStatusMap.value[fileName] || {}
+  if (Boolean(lockInfo.locked) && Boolean(lockInfo.self)) {
+    return 'success'
+  }
+  if (Boolean(lockInfo.locked)) {
+    return 'warning'
+  }
+  return 'info'
+}
+
 function openEditor(fileName) {
   if (!fileName) {
     ElMessage.warning('没有可编辑的文件')
+    return
+  }
+  if (isLockedByOthers(fileName)) {
+    ElMessage.warning(getLockLabel(fileName))
     return
   }
   router.push({

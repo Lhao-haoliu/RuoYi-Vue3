@@ -2,10 +2,10 @@
   <div class="excel-editor-page">
     <section class="hero-card">
       <div>
-        <p class="eyebrow">Format Preserving Editor</p>
+        <p class="eyebrow">格式保留编辑器</p>
         <h1>在线 Excel 编辑</h1>
         <p class="hero-desc">
-          当前版本会基于后端原始工作簿直接修改单元格内容，并尽量保留合并单元格、底色、字体、列宽、行高等原始格式。
+          当前版本会在后端直接修改原始工作簿，并尽量保留合并单元格、底色、字体、列宽、行高等原有样式。
         </p>
       </div>
       <div class="hero-actions">
@@ -29,8 +29,8 @@
       </article>
       <article class="summary-card">
         <span class="summary-label">保存状态</span>
-        <strong>{{ isDirty ? `有 ${dirtyCount} 处未保存修改` : '已同步' }}</strong>
-        <span>{{ isDirty ? '保存时会提交改动单元格和合并布局' : '当前内容与服务器文件一致' }}</span>
+        <strong>{{ isDirty ? `未保存修改：${dirtyCount}` : '已同步' }}</strong>
+        <span>{{ isDirty ? '保存时会提交改单元格与布局更新。' : '当前内容与服务器文件一致。' }}</span>
       </article>
     </section>
 
@@ -40,6 +40,7 @@
           <div class="toolbar-left">
             <el-tag type="info" effect="light">编辑文件：{{ currentFileName }}</el-tag>
             <el-tag :type="isDirty ? 'warning' : 'success'" effect="light">{{ isDirty ? '未保存' : '已保存' }}</el-tag>
+            <el-tag v-if="lockStatusLabel" :type="lockState.self ? 'success' : 'warning'" effect="light">{{ lockStatusLabel }}</el-tag>
           </div>
           <div class="toolbar-right">
             <span class="selection-tip">{{ selectionLabel }}</span>
@@ -66,7 +67,7 @@
                 class="sheet-image-item background"
                 :style="buildImageStyle(image)"
               >
-                <img class="sheet-image" :src="image.src" :alt="image.description || 'background image'" draggable="false" />
+              <img class="sheet-image" :src="image.src" :alt="image.description || '背景图片'" draggable="false" />
               </div>
             </div>
 
@@ -154,14 +155,14 @@
                 class="sheet-image-item anchored"
                 :style="buildImageStyle(image)"
               >
-                <img class="sheet-image" :src="image.src" :alt="image.description || 'embedded image'" draggable="false" />
+                <img class="sheet-image" :src="image.src" :alt="image.description || '嵌入图片'" draggable="false" />
               </div>
             </div>
           </div>
         </div>
       </template>
 
-      <el-empty v-else description="还没有加载可编辑的文件，请先去文件管理页选择一份已上传 Excel。" />
+      <el-empty v-else description="还没有加载可编辑文件，请先在文件管理中选择已上传的 Excel。" />
     </section>
   </div>
 </template>
@@ -171,7 +172,15 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { saveAs } from 'file-saver'
-import { applyExcelWorkbookChanges, getExcelEditorContent, getExcelEditorInfo, getExcelWorkbookView } from '@/api/tool/excelEditor'
+import {
+  acquireExcelEditorLock,
+  applyExcelWorkbookChanges,
+  getExcelEditorContent,
+  getExcelEditorInfo,
+  getExcelWorkbookView,
+  heartbeatExcelEditorLock,
+  releaseExcelEditorLock
+} from '@/api/tool/excelEditor'
 
 const DEFAULT_ROW_HEIGHT = 28
 const MIN_ROW_HEIGHT = 24
@@ -181,6 +190,7 @@ const DEFAULT_CELL_HEIGHT = 32
 const COLUMN_HEADER_HEIGHT = 34
 const ROW_INDEX_WIDTH = 56
 const MAX_CELL_TEXT_LENGTH = 32767
+const LOCK_HEARTBEAT_INTERVAL = 30000
 
 const route = useRoute()
 const router = useRouter()
@@ -189,6 +199,7 @@ const workbookName = ref('未加载')
 const sheets = ref([])
 const activeSheetName = ref('')
 const currentFileName = ref('')
+const currentWorkbookVersion = ref('')
 const pageLoading = ref(false)
 const loadingServerFile = ref(false)
 const saving = ref(false)
@@ -199,6 +210,15 @@ const selection = ref(null)
 const showedCellLimitHint = ref(false)
 const columnResizeState = ref(null)
 const rowResizeState = ref(null)
+const lockState = ref({
+  fileName: '',
+  ownerUsername: '',
+  expiresAt: 0,
+  self: false
+})
+const lockHeartbeatTimer = ref(null)
+const lockWarningShown = ref(false)
+const dirtyRefreshRafId = ref(0)
 
 const currentSheet = computed(() => sheets.value.find((sheet) => sheet.name === activeSheetName.value) || null)
 const hasWorkbook = computed(() => sheets.value.length > 0)
@@ -210,7 +230,7 @@ const activeSelection = computed(() => {
 })
 const selectionLabel = computed(() => {
   if (!activeSelection.value) {
-    return '点击单元格选择，Shift + 点击扩展选区'
+    return '点击单元格选择，按住 Shift 可扩展选区'
   }
   return `选区 ${formatSelectionRange(activeSelection.value)}`
 })
@@ -226,13 +246,28 @@ const canUnmergeSelection = computed(() => {
   }
   return currentSheet.value.cells.some((cell) => isMergedCell(cell) && rangesIntersect(activeSelection.value, getCellRange(cell)))
 })
+const lockStatusLabel = computed(() => {
+  if (!currentFileName.value || !lockState.value.fileName) {
+    return ''
+  }
+  if (lockState.value.self) {
+    return `编辑锁：你（${lockState.value.ownerUsername || '当前用户'}）`
+  }
+  if (lockState.value.ownerUsername) {
+    return `被 ${lockState.value.ownerUsername} 锁定`
+  }
+  return ''
+})
 
 onMounted(async () => {
   await initializeFromRoute()
 })
 
 onBeforeUnmount(() => {
+  cancelDirtyStateRefresh()
   clearResizeState()
+  stopLockHeartbeat()
+  releaseActiveLock(false)
 })
 
 watch(
@@ -279,7 +314,7 @@ async function initializeFromRoute() {
     await loadWorkbookByFileName(fallbackFileName, true)
   } catch (error) {
     clearWorkbook()
-    ElMessage.error(error?.message || '读取文件信息失败')
+    ElMessage.error(error?.message || '加载文件信息失败')
   }
 }
 
@@ -288,7 +323,7 @@ async function confirmReplaceWorkbook() {
     return true
   }
   try {
-    await ElMessageBox.confirm('当前有未保存修改，继续切换会丢失这些改动，是否继续？', '确认切换', {
+    await ElMessageBox.confirm('当前工作簿有未保存修改，切换文件会丢失这些改动，是否继续？', '确认切换', {
       type: 'warning',
       confirmButtonText: '继续',
       cancelButtonText: '取消'
@@ -299,25 +334,144 @@ async function confirmReplaceWorkbook() {
   }
 }
 
+async function acquireEditorLock(fileName) {
+  try {
+    const response = await acquireExcelEditorLock({
+      fileName,
+      force: false
+    })
+    if (response?.code === 200) {
+      applyLockState(response?.data || {}, fileName)
+      startLockHeartbeat()
+      return true
+    }
+    applyLockState(response?.data || {}, fileName)
+    ElMessage.warning(response?.msg || '该文件正在被其他用户编辑，请稍后再试')
+    return false
+  } catch (error) {
+    ElMessage.error(error?.message || '获取编辑锁失败')
+    return false
+  }
+}
+
+function applyLockState(lockData, fallbackFileName = '') {
+  lockState.value = {
+    fileName: lockData?.fileName || fallbackFileName || '',
+    ownerUsername: lockData?.ownerUsername || '',
+    expiresAt: Number(lockData?.expiresAt || 0),
+    self: Boolean(lockData?.self)
+  }
+  lockWarningShown.value = false
+}
+
+function resetLockState() {
+  lockState.value = {
+    fileName: '',
+    ownerUsername: '',
+    expiresAt: 0,
+    self: false
+  }
+  lockWarningShown.value = false
+}
+
+function startLockHeartbeat() {
+  stopLockHeartbeat()
+  lockHeartbeatTimer.value = setInterval(() => {
+    heartbeatCurrentLock()
+  }, LOCK_HEARTBEAT_INTERVAL)
+}
+
+function stopLockHeartbeat() {
+  if (lockHeartbeatTimer.value) {
+    clearInterval(lockHeartbeatTimer.value)
+    lockHeartbeatTimer.value = null
+  }
+}
+
+async function heartbeatCurrentLock() {
+  const fileName = lockState.value.fileName
+  if (!fileName || !lockState.value.self) {
+    return
+  }
+  try {
+    const response = await heartbeatExcelEditorLock({ fileName })
+    if (response?.code === 200) {
+      applyLockState(response?.data || {}, fileName)
+      return
+    }
+    stopLockHeartbeat()
+    applyLockState(response?.data || {}, fileName)
+    if (!lockWarningShown.value) {
+      lockWarningShown.value = true
+      ElMessage.warning(response?.msg || '编辑锁已失效')
+    }
+  } catch (error) {
+    stopLockHeartbeat()
+    if (!lockWarningShown.value) {
+      lockWarningShown.value = true
+      ElMessage.warning(error?.message || '编辑锁心跳失败')
+    }
+  }
+}
+
+async function releaseActiveLock(showError = false) {
+  if (!lockState.value.fileName) {
+    return
+  }
+  await releaseLockByFileName(lockState.value.fileName, showError)
+}
+
+async function releaseLockByFileName(fileName, showError = false) {
+  if (!fileName) {
+    return
+  }
+  stopLockHeartbeat()
+  try {
+    const response = await releaseExcelEditorLock({ fileName })
+    if (response?.code !== 200 && showError) {
+      ElMessage.error(response?.msg || '释放编辑锁失败')
+    }
+  } catch (error) {
+    if (showError) {
+      ElMessage.error(error?.message || '释放编辑锁失败')
+    }
+  } finally {
+    if (lockState.value.fileName === fileName) {
+      resetLockState()
+    }
+  }
+}
+
 async function loadWorkbookByFileName(fileName, skipConfirm = false) {
   if (!fileName) {
+    await releaseActiveLock(false)
     clearWorkbook()
     return
   }
+  const normalizedFileName = normalizeQueryFileName(fileName)
   if (!skipConfirm) {
     const confirmed = await confirmReplaceWorkbook()
     if (!confirmed) {
       return
     }
   }
+  if (lockState.value.self && lockState.value.fileName && lockState.value.fileName !== normalizedFileName) {
+    await releaseActiveLock(false)
+  }
+  const lockAcquired = await acquireEditorLock(normalizedFileName)
+  if (!lockAcquired) {
+    clearWorkbook()
+    return
+  }
   loadingServerFile.value = true
   pageLoading.value = true
   try {
-    const response = await getExcelWorkbookView(fileName)
+    const response = await getExcelWorkbookView(normalizedFileName)
     applyWorkbookView(response?.data || {})
     ElMessage.success('文件已加载')
   } catch (error) {
-    ElMessage.error(error?.message || '加载文件失败')
+    await releaseActiveLock(false)
+    ElMessage.error(error?.message || '加载工作簿失败')
   } finally {
     loadingServerFile.value = false
     pageLoading.value = false
@@ -329,6 +483,7 @@ function applyWorkbookView(data) {
   sheets.value = nextSheets
   activeSheetName.value = nextSheets[0]?.name || ''
   currentFileName.value = data?.currentFileName || data?.fileName || ''
+  currentWorkbookVersion.value = data?.version ? String(data.version) : ''
   workbookName.value = data?.fileName || currentFileName.value || '未加载'
   clearSelection()
   refreshDirtyState()
@@ -391,6 +546,7 @@ function normalizeSheet(sheet) {
   normalized.originalMergeKeys = collectSheetMergeKeys(normalized)
   normalized.originalRowHeights = normalized.rowHeights.map((height) => Math.round(Number(height)))
   normalized.originalColumnWidths = normalized.columnWidths.map((width) => Math.round(Number(width)))
+  initializeSheetDirtyMetrics(normalized)
   return normalized
 }
 
@@ -480,10 +636,13 @@ function applyColumnWidthHint(columnWidths, cell) {
 }
 
 function clearWorkbook() {
+  releaseActiveLock(false)
+  cancelDirtyStateRefresh()
   workbookName.value = '未加载'
   sheets.value = []
   activeSheetName.value = ''
   currentFileName.value = ''
+  currentWorkbookVersion.value = ''
   clearSelection()
   isDirty.value = false
   dirtyCount.value = 0
@@ -498,12 +657,24 @@ function handleCellInput(cell) {
   if (normalized.length > MAX_CELL_TEXT_LENGTH) {
     cell.value = normalized.slice(0, MAX_CELL_TEXT_LENGTH)
     if (!showedCellLimitHint.value) {
-      ElMessage.warning(`单元格内容已超过 Excel 限制，已截断到 ${MAX_CELL_TEXT_LENGTH} 字符`)
+      ElMessage.warning(`单元格内容超过 Excel 限制，已截断至 ${MAX_CELL_TEXT_LENGTH} 个字符`)
       showedCellLimitHint.value = true
     }
   }
-  cell.dirty = cell.forceDirty || normalizeValue(cell.value) !== normalizeValue(cell.originalValue)
-  refreshDirtyState()
+  const wasDirty = Boolean(cell.dirty)
+  const nextDirty = cell.forceDirty || normalizeValue(cell.value) !== normalizeValue(cell.originalValue)
+  cell.dirty = nextDirty
+  if (wasDirty !== nextDirty) {
+    const sheet = currentSheet.value
+    if (sheet) {
+      ensureSheetDirtyMetrics(sheet)
+      sheet.cellDirtyCount += nextDirty ? 1 : -1
+      if (sheet.cellDirtyCount < 0) {
+        sheet.cellDirtyCount = 0
+      }
+    }
+  }
+  scheduleDirtyStateRefresh()
 }
 
 function handleCellSelection(cell, event) {
@@ -550,11 +721,11 @@ async function mergeSelectedCells() {
   const sheet = currentSheet.value
   const range = activeSelection.value
   if (!sheet || !range) {
-    ElMessage.warning('请先选择要合并的单元格')
+    ElMessage.warning('请先选择需要合并的单元格')
     return
   }
   if (getSelectionArea(range) < 2) {
-    ElMessage.info('至少选择两个单元格后才能合并')
+    ElMessage.info('至少选择 2 个单元格后才能合并')
     return
   }
 
@@ -569,9 +740,9 @@ async function mergeSelectedCells() {
   })
   if (cellsToClear.length) {
     try {
-      await ElMessageBox.confirm('合并后仅保留左上角内容，其余内容会被清空，是否继续？', '确认合并', {
+      await ElMessageBox.confirm('合并后仅保留左上角内容，范围内其它内容会被清空，是否继续？', '确认合并', {
         type: 'warning',
-        confirmButtonText: '继续合并',
+        confirmButtonText: '确认合并',
         cancelButtonText: '取消'
       })
     } catch {
@@ -582,7 +753,7 @@ async function mergeSelectedCells() {
   expandMergedCellsToSingles(sheet, range)
   const topLeftCell = findCellAt(sheet, range.startRow, range.startCol)
   if (!topLeftCell) {
-    ElMessage.warning('选区无效，无法执行合并')
+    ElMessage.warning('选区无效，无法合并')
     return
   }
 
@@ -604,6 +775,8 @@ async function mergeSelectedCells() {
 
   sheet.cells = dedupeCells(nextCells)
   rebuildSheetRows(sheet)
+  recountSheetCellDirtyCount(sheet)
+  recountSheetMergeDirtyCount(sheet)
   selection.value = {
     sheetName: sheet.name,
     anchorStartRow: range.startRow,
@@ -615,8 +788,8 @@ async function mergeSelectedCells() {
     startCol: range.startCol,
     endCol: range.endCol
   }
-  refreshDirtyState()
-  ElMessage.success('已更新合并区域，保存后会写回文件')
+  scheduleDirtyStateRefresh()
+  ElMessage.success('合并区域已更新，保存后将写回文件')
 }
 
 function unmergeSelectedCells() {
@@ -650,8 +823,10 @@ function unmergeSelectedCells() {
 
   sheet.cells = dedupeCells(nextCells)
   rebuildSheetRows(sheet)
-  refreshDirtyState()
-  ElMessage.success('已拆分合并区域，保存后会写回文件')
+  recountSheetCellDirtyCount(sheet)
+  recountSheetMergeDirtyCount(sheet)
+  scheduleDirtyStateRefresh()
+  ElMessage.success('已取消合并，保存后将写回文件')
 }
 
 function expandMergedCellsToSingles(sheet, range) {
@@ -731,38 +906,150 @@ function isCellTopLeftInsideRange(cell, range) {
     && cell.colIndex <= range.endCol
 }
 
-function refreshDirtyState() {
-  let cellChanges = 0
-  for (const sheet of sheets.value) {
-    for (const cell of sheet.cells) {
-      if (cell.dirty) {
-        cellChanges += 1
-      }
-    }
+function scheduleDirtyStateRefresh() {
+  if (dirtyRefreshRafId.value) {
+    return
   }
-  const mergeChanges = countMergeChanges()
-  const dimensionChanges = countDimensionChanges()
-  dirtyCount.value = cellChanges + mergeChanges + dimensionChanges
-  isDirty.value = dirtyCount.value > 0
+  dirtyRefreshRafId.value = requestAnimationFrame(() => {
+    dirtyRefreshRafId.value = 0
+    refreshDirtyState()
+  })
 }
 
-function countMergeChanges() {
-  let count = 0
+function cancelDirtyStateRefresh() {
+  if (!dirtyRefreshRafId.value) {
+    return
+  }
+  cancelAnimationFrame(dirtyRefreshRafId.value)
+  dirtyRefreshRafId.value = 0
+}
+
+function refreshDirtyState() {
+  let totalChanges = 0
   for (const sheet of sheets.value) {
-    const current = new Set(collectSheetMergeKeys(sheet))
-    const original = new Set(sheet.originalMergeKeys || [])
-    for (const key of current) {
-      if (!original.has(key)) {
-        count += 1
-      }
-    }
-    for (const key of original) {
-      if (!current.has(key)) {
-        count += 1
-      }
+    ensureSheetDirtyMetrics(sheet)
+    totalChanges += Number(sheet.cellDirtyCount || 0)
+    totalChanges += Number(sheet.mergeDirtyCount || 0)
+    totalChanges += sheet.rowDirtyIndexes.size
+    totalChanges += sheet.columnDirtyIndexes.size
+  }
+  dirtyCount.value = totalChanges
+  isDirty.value = totalChanges > 0
+}
+
+function ensureSheetDirtyMetrics(sheet) {
+  if (!sheet) {
+    return
+  }
+  if (typeof sheet.cellDirtyCount !== 'number') {
+    sheet.cellDirtyCount = countSheetDirtyCells(sheet)
+  }
+  if (typeof sheet.mergeDirtyCount !== 'number') {
+    sheet.mergeDirtyCount = calculateSheetMergeDirtyCount(sheet)
+  }
+  if (!(sheet.rowDirtyIndexes instanceof Set)) {
+    sheet.rowDirtyIndexes = buildDimensionDirtySet(sheet.rowHeights, sheet.originalRowHeights, DEFAULT_ROW_HEIGHT)
+  }
+  if (!(sheet.columnDirtyIndexes instanceof Set)) {
+    sheet.columnDirtyIndexes = buildDimensionDirtySet(sheet.columnWidths, sheet.originalColumnWidths, DEFAULT_COLUMN_WIDTH)
+  }
+}
+
+function initializeSheetDirtyMetrics(sheet) {
+  if (!sheet) {
+    return
+  }
+  sheet.cellDirtyCount = countSheetDirtyCells(sheet)
+  sheet.mergeDirtyCount = calculateSheetMergeDirtyCount(sheet)
+  sheet.rowDirtyIndexes = buildDimensionDirtySet(sheet.rowHeights, sheet.originalRowHeights, DEFAULT_ROW_HEIGHT)
+  sheet.columnDirtyIndexes = buildDimensionDirtySet(sheet.columnWidths, sheet.originalColumnWidths, DEFAULT_COLUMN_WIDTH)
+}
+
+function countSheetDirtyCells(sheet) {
+  let count = 0
+  for (const cell of sheet.cells) {
+    if (cell.dirty) {
+      count += 1
     }
   }
   return count
+}
+
+function recountSheetCellDirtyCount(sheet) {
+  ensureSheetDirtyMetrics(sheet)
+  sheet.cellDirtyCount = countSheetDirtyCells(sheet)
+}
+
+function recountSheetMergeDirtyCount(sheet) {
+  ensureSheetDirtyMetrics(sheet)
+  sheet.mergeDirtyCount = calculateSheetMergeDirtyCount(sheet)
+}
+
+function calculateSheetMergeDirtyCount(sheet) {
+  const current = new Set(collectSheetMergeKeys(sheet))
+  const original = new Set(sheet.originalMergeKeys || [])
+  return calculateSetDifferenceCount(current, original)
+}
+
+function calculateSetDifferenceCount(currentSet, originalSet) {
+  let count = 0
+  for (const key of currentSet) {
+    if (!originalSet.has(key)) {
+      count += 1
+    }
+  }
+  for (const key of originalSet) {
+    if (!currentSet.has(key)) {
+      count += 1
+    }
+  }
+  return count
+}
+
+function buildDimensionDirtySet(currentValues, originalValues, fallbackValue) {
+  const dirtySet = new Set()
+  const current = Array.isArray(currentValues) ? currentValues : []
+  const original = Array.isArray(originalValues) ? originalValues : []
+  const length = Math.max(current.length, original.length)
+  for (let index = 0; index < length; index += 1) {
+    const currentValue = Math.round(Number(current[index] ?? fallbackValue))
+    const originalValue = Math.round(Number(original[index] ?? fallbackValue))
+    if (currentValue !== originalValue) {
+      dirtySet.add(index)
+    }
+  }
+  return dirtySet
+}
+
+function updateRowDirtyMarker(sheet, rowIndex) {
+  ensureSheetDirtyMetrics(sheet)
+  const currentValue = Math.round(Number(sheet.rowHeights[rowIndex] ?? DEFAULT_ROW_HEIGHT))
+  const originalValue = Math.round(Number(sheet.originalRowHeights?.[rowIndex] ?? DEFAULT_ROW_HEIGHT))
+  if (currentValue !== originalValue) {
+    sheet.rowDirtyIndexes.add(rowIndex)
+  } else {
+    sheet.rowDirtyIndexes.delete(rowIndex)
+  }
+}
+
+function updateColumnDirtyMarker(sheet, colIndex) {
+  ensureSheetDirtyMetrics(sheet)
+  const currentValue = Math.round(Number(sheet.columnWidths[colIndex] ?? DEFAULT_COLUMN_WIDTH))
+  const originalValue = Math.round(Number(sheet.originalColumnWidths?.[colIndex] ?? DEFAULT_COLUMN_WIDTH))
+  if (currentValue !== originalValue) {
+    sheet.columnDirtyIndexes.add(colIndex)
+  } else {
+    sheet.columnDirtyIndexes.delete(colIndex)
+  }
+}
+
+function countMergeChanges() {
+  let total = 0
+  for (const sheet of sheets.value) {
+    ensureSheetDirtyMetrics(sheet)
+    total += Number(sheet.mergeDirtyCount || 0)
+  }
+  return total
 }
 
 function collectSheetMergeKeys(sheet) {
@@ -809,29 +1096,6 @@ function collectMergeRegions() {
   return regions
 }
 
-function countDimensionChanges() {
-  let count = 0
-  for (const sheet of sheets.value) {
-    const rowLength = Math.max(sheet.rowHeights.length, (sheet.originalRowHeights || []).length)
-    for (let index = 0; index < rowLength; index += 1) {
-      const current = Math.round(Number(sheet.rowHeights[index] ?? DEFAULT_ROW_HEIGHT))
-      const original = Math.round(Number(sheet.originalRowHeights?.[index] ?? DEFAULT_ROW_HEIGHT))
-      if (current !== original) {
-        count += 1
-      }
-    }
-    const columnLength = Math.max(sheet.columnWidths.length, (sheet.originalColumnWidths || []).length)
-    for (let index = 0; index < columnLength; index += 1) {
-      const current = Math.round(Number(sheet.columnWidths[index] ?? DEFAULT_COLUMN_WIDTH))
-      const original = Math.round(Number(sheet.originalColumnWidths?.[index] ?? DEFAULT_COLUMN_WIDTH))
-      if (current !== original) {
-        count += 1
-      }
-    }
-  }
-  return count
-}
-
 function collectRowHeightChanges() {
   const changes = []
   for (const sheet of sheets.value) {
@@ -872,8 +1136,20 @@ function collectColumnWidthChanges() {
 
 async function saveToServer() {
   if (!currentFileName.value || !hasWorkbook.value) {
-    ElMessage.warning('请先选择并加载一份 Excel 文件')
+    ElMessage.warning('请先加载 Excel 文件')
     return
+  }
+  if (!currentWorkbookVersion.value) {
+    ElMessage.warning('当前文件版本信息缺失，请先重新加载后再保存')
+    await loadWorkbookByFileName(currentFileName.value, true)
+    return
+  }
+
+  if (!lockState.value.self || lockState.value.fileName !== currentFileName.value) {
+    const lockAcquired = await acquireEditorLock(currentFileName.value)
+    if (!lockAcquired) {
+      return
+    }
   }
 
   const changes = collectChanges()
@@ -889,16 +1165,27 @@ async function saveToServer() {
   try {
     const response = await applyExcelWorkbookChanges({
       fileName: currentFileName.value,
+      version: currentWorkbookVersion.value,
       changes,
       mergeRegions: mergeChanges ? collectMergeRegions() : undefined,
       rowHeights: rowHeightChanges.length ? rowHeightChanges : undefined,
       columnWidths: columnWidthChanges.length ? columnWidthChanges : undefined
     })
+    if (response?.code !== 200) {
+      if (response?.data?.versionConflict) {
+        const nextFileName = response?.data?.currentFileName || currentFileName.value
+        ElMessage.warning(response?.msg || '文件已在服务器更新，请重新加载后再保存')
+        await loadWorkbookByFileName(nextFileName, true)
+        return
+      }
+      ElMessage.error(response?.msg || '保存工作簿失败')
+      return
+    }
     const nextFileName = response?.data?.currentFileName || currentFileName.value
     await loadWorkbookByFileName(nextFileName, true)
-    ElMessage.success(response?.msg || 'Excel 已在线保存')
+    ElMessage.success(response?.msg || 'Excel 保存成功')
   } catch (error) {
-    ElMessage.error(error?.message || '在线保存失败')
+    ElMessage.error(error?.message || '保存工作簿失败')
   } finally {
     saving.value = false
   }
@@ -906,7 +1193,7 @@ async function saveToServer() {
 
 async function reloadWorkbook() {
   if (!currentFileName.value) {
-    ElMessage.warning('当前没有选中的文件')
+    ElMessage.warning('当前未选择文件')
     return
   }
   await loadWorkbookByFileName(currentFileName.value)
@@ -914,13 +1201,13 @@ async function reloadWorkbook() {
 
 async function downloadServerWorkbook() {
   if (!currentFileName.value) {
-    ElMessage.warning('当前没有可下载的文件')
+    ElMessage.warning('当前没有可下载文件')
     return
   }
   try {
     const buffer = await getExcelEditorContent(currentFileName.value)
     saveAs(new Blob([buffer]), currentFileName.value)
-    ElMessage.success('文件已下载')
+    ElMessage.success('文件下载成功')
   } catch (error) {
     ElMessage.error(error?.message || '下载失败')
   }
@@ -1194,8 +1481,9 @@ function handleResizePointerMove(event) {
     const nextWidth = Math.max(MIN_COLUMN_WIDTH, Math.round(state.startWidth + delta))
     if (sheet.columnWidths[state.colIndex] !== nextWidth) {
       sheet.columnWidths[state.colIndex] = nextWidth
-      rebuildSheetRows(sheet)
-      refreshDirtyState()
+      updateCellsForColumnResize(sheet, state.colIndex)
+      updateColumnDirtyMarker(sheet, state.colIndex)
+      scheduleDirtyStateRefresh()
     }
     return
   }
@@ -1206,10 +1494,48 @@ function handleResizePointerMove(event) {
     const nextHeight = Math.max(MIN_ROW_HEIGHT, Math.round(state.startHeight + delta))
     if (sheet.rowHeights[state.rowIndex] !== nextHeight) {
       sheet.rowHeights[state.rowIndex] = nextHeight
-      rebuildSheetRows(sheet)
-      refreshDirtyState()
+      if (Array.isArray(sheet.rows) && sheet.rows[state.rowIndex]) {
+        sheet.rows[state.rowIndex].heightPx = nextHeight
+      }
+      updateCellsForRowResize(sheet, state.rowIndex)
+      updateRowDirtyMarker(sheet, state.rowIndex)
+      scheduleDirtyStateRefresh()
     }
   }
+}
+
+function updateCellsForColumnResize(sheet, colIndex) {
+  for (const cell of sheet.cells) {
+    if (colIndex < cell.colIndex || colIndex >= cell.colIndex + cell.colSpan) {
+      continue
+    }
+    cell.widthPx = resolveRangeWidthFast(sheet, cell.colIndex, cell.colSpan)
+  }
+}
+
+function updateCellsForRowResize(sheet, rowIndex) {
+  for (const cell of sheet.cells) {
+    if (rowIndex < cell.rowIndex || rowIndex >= cell.rowIndex + cell.rowSpan) {
+      continue
+    }
+    cell.heightPx = resolveRangeHeightFast(sheet, cell.rowIndex, cell.rowSpan)
+  }
+}
+
+function resolveRangeWidthFast(sheet, startColumnIndex, colSpan) {
+  let total = 0
+  for (let offset = 0; offset < colSpan; offset += 1) {
+    total += Math.max(Number(sheet.columnWidths[startColumnIndex + offset] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+  }
+  return total
+}
+
+function resolveRangeHeightFast(sheet, startRowIndex, rowSpan) {
+  let total = 0
+  for (let offset = 0; offset < rowSpan; offset += 1) {
+    total += Math.max(Number(sheet.rowHeights[startRowIndex + offset] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+  }
+  return total
 }
 
 function stopResize() {
@@ -1391,7 +1717,8 @@ function buildCellKey(rowIndex, colIndex) {
   return `${rowIndex}:${colIndex}`
 }
 
-function goToFileCenter() {
+async function goToFileCenter() {
+  await releaseActiveLock(false)
   router.push('/excel-editor/files')
 }
 </script>
@@ -1673,7 +2000,7 @@ h1 {
 }
 
 .sheet-cell.has-validation::after {
-  content: "▼";
+  content: "v";
   position: absolute;
   right: 8px;
   bottom: 6px;
