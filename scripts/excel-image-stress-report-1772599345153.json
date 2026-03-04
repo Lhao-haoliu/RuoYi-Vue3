@@ -1,0 +1,116 @@
+{
+  "timestamp": "2026-03-04T04:41:50.255Z",
+  "baseUrl": "http://127.0.0.1",
+  "apiUrl": "http://127.0.0.1:8080",
+  "workbookPath": "C:\\Users\\Administrator\\Desktop\\stress-images-20mb.xlsx",
+  "workbookSizeMB": 20.32,
+  "upload": {
+    "fileName": "stress-images-20mb_1772599310770.xlsx",
+    "httpStatus": 200,
+    "responseCode": 200,
+    "responseMsg": "Excel uploaded to server storage",
+    "uploadMs": 504
+  },
+  "loadRounds": [
+    {
+      "round": 1,
+      "viewStatus": 200,
+      "navToViewMs": 2723,
+      "navToFirstCellMs": 4803,
+      "navToUiReadyMs": 4816,
+      "pageStats": {
+        "imageCount": 36,
+        "cellCount": 6000,
+        "scrollMax": 8620,
+        "heapMB": 97.3
+      },
+      "scrollProbe": {
+        "rounds": 5,
+        "avgMs": 224.4,
+        "maxMs": 316.5
+      }
+    },
+    {
+      "round": 2,
+      "viewStatus": 200,
+      "navToViewMs": 1286,
+      "navToFirstCellMs": 3278,
+      "navToUiReadyMs": 3289,
+      "pageStats": {
+        "imageCount": 36,
+        "cellCount": 6000,
+        "scrollMax": 8620,
+        "heapMB": 162.22
+      },
+      "scrollProbe": {
+        "rounds": 5,
+        "avgMs": 200.28,
+        "maxMs": 300.8
+      }
+    },
+    {
+      "round": 3,
+      "viewStatus": 200,
+      "navToViewMs": 879,
+      "navToFirstCellMs": 2809,
+      "navToUiReadyMs": 2838,
+      "pageStats": {
+        "imageCount": 36,
+        "cellCount": 6000,
+        "scrollMax": 8620,
+        "heapMB": 80.99
+      },
+      "scrollProbe": {
+        "rounds": 5,
+        "avgMs": 237.94,
+        "maxMs": 298.6
+      }
+    }
+  ],
+  "saveRounds": [
+    {
+      "round": 1,
+      "editMs": 2387,
+      "saveMs": 1245,
+      "responseStatus": 200,
+      "responseCode": 200
+    },
+    {
+      "round": 2,
+      "editMs": 2196,
+      "saveMs": 992,
+      "responseStatus": 200,
+      "responseCode": 200
+    },
+    {
+      "round": 3,
+      "editMs": 2307,
+      "saveMs": 988,
+      "responseStatus": 200,
+      "responseCode": 200
+    }
+  ],
+  "summary": {
+    "uploadMs": 504,
+    "navToViewMs": {
+      "avg": 1629.33,
+      "min": 879,
+      "max": 2723
+    },
+    "navToFirstCellMs": {
+      "avg": 3630,
+      "min": 2809,
+      "max": 4803
+    },
+    "navToUiReadyMs": {
+      "avg": 3647.67,
+      "min": 2838,
+      "max": 4816
+    },
+    "saveMs": {
+      "avg": 1075,
+      "min": 988,
+      "max": 1245
+    }
+  }
+}

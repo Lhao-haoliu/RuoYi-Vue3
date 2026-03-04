@@ -1,0 +1,5337 @@
+diff --git a/src/views/tool/excel-editor/index.vue b/src/views/tool/excel-editor/index.vue
+index acc631d..b770fb8 100644
+--- a/src/views/tool/excel-editor/index.vue
++++ b/src/views/tool/excel-editor/index.vue
+@@ -1,36 +1,36 @@
+-<template>
++?<template>
+   <div class="excel-editor-page">
+     <section class="hero-card">
+       <div>
+-        <p class="eyebrow">格式保留编辑器</p>
+-        <h1>在线 Excel 编辑</h1>
++        <p class="eyebrow">?</p>
++        <h1> Excel </h1>
+         <p class="hero-desc">
+-          当前版本会在后端直接修改原始工作簿，并尽量保留合并单元格、底色、字体、列宽、行高等原有样式。
++          
+         </p>
+       </div>
+       <div class="hero-actions">
+-        <el-button @click="goToFileCenter">返回文件管理</el-button>
+-        <el-button :loading="loadingServerFile" :disabled="!currentFileName" @click="reloadWorkbook">重新加载</el-button>
+-        <el-button type="success" :loading="saving" :disabled="!hasWorkbook" @click="saveToServer">在线保存</el-button>
+-        <el-button :disabled="!currentFileName" @click="downloadServerWorkbook">下载当前文件</el-button>
++        <el-button @click="goToFileCenter"></el-button>
++        <el-button :loading="loadingServerFile" :disabled="!currentFileName" @click="reloadWorkbook"></el-button>
++        <el-button type="success" :loading="saving" :disabled="!hasWorkbook" @click="saveToServer"></el-button>
++        <el-button :disabled="!currentFileName" @click="downloadServerWorkbook"></el-button>
+       </div>
+     </section>
+ 
+     <section class="summary-grid">
+       <article class="summary-card">
+-        <span class="summary-label">当前文件</span>
+-        <strong>{{ currentFileName || '未选择' }}</strong>
++        <span class="summary-label"></span>
++        <strong>{{ currentFileName || '?' }}</strong>
+         <span>{{ workbookName }}</span>
+       </article>
+       <article class="summary-card">
+-        <span class="summary-label">工作表</span>
+-        <strong>{{ currentSheet ? currentSheet.name : '未加载' }}</strong>
+-        <span>{{ sheets.length }} 个工作表</span>
++        <span class="summary-label">?</span>
++        <strong>{{ currentSheet ? currentSheet.name : '?' }}</strong>
++        <span>{{ sheets.length }} </span>
+       </article>
+       <article class="summary-card">
+-        <span class="summary-label">保存状态</span>
+-        <strong>{{ isDirty ? `未保存修改：${dirtyCount}` : '已同步' }}</strong>
+-        <span>{{ isDirty ? '保存时会提交改单元格与布局更新。' : '当前内容与服务器文件一致。' }}</span>
++        <span class="summary-label"></span>
++        <strong>{{ isDirty ? `${dirtyCount}` : '?' }}</strong>
++        <span>{{ isDirty ? '' : '?' }}</span>
+       </article>
+     </section>
+ 
+@@ -38,17 +38,129 @@
+       <template v-if="hasWorkbook">
+         <div class="toolbar">
+           <div class="toolbar-left">
+-            <el-tag type="info" effect="light">编辑文件：{{ currentFileName }}</el-tag>
+-            <el-tag :type="isDirty ? 'warning' : 'success'" effect="light">{{ isDirty ? '未保存' : '已保存' }}</el-tag>
++            <el-tag type="info" effect="light">?{{ currentFileName }}</el-tag>
++            <el-tag :type="isDirty ? 'warning' : 'success'" effect="light">{{ isDirty ? '?' : '?' }}</el-tag>
+             <el-tag v-if="lockStatusLabel" :type="lockState.self ? 'success' : 'warning'" effect="light">{{ lockStatusLabel }}</el-tag>
+           </div>
+           <div class="toolbar-right">
+             <span class="selection-tip">{{ selectionLabel }}</span>
+-            <el-button size="small" :disabled="!canMergeSelection" @click="mergeSelectedCells">合并单元格</el-button>
+-            <el-button size="small" :disabled="!canUnmergeSelection" @click="unmergeSelectedCells">取消合并</el-button>
++            <el-button size="small" :disabled="!canUndo" @click="undoLastAction"></el-button>
++            <el-button size="small" :disabled="!canRedo" @click="redoLastAction"></el-button>
++            <el-button size="small" :disabled="!activeSelection" @click="copySelection(false)"></el-button>
++            <el-button size="small" :disabled="!activeSelection" @click="copySelection(true)"></el-button>
++            <el-button size="small" :disabled="!activeSelection" @click="pasteToSelection"></el-button>
++            <el-button size="small" @click="openFindReplaceDialog"></el-button>
++            <el-button size="small" :disabled="!canMergeSelection" @click="mergeSelectedCells">?</el-button>
++            <el-button size="small" :disabled="!canUnmergeSelection" @click="unmergeSelectedCells"></el-button>
++            <el-button size="small" :disabled="!activeSelection" @click="insertRowAbove"></el-button>
++            <el-button size="small" :disabled="!activeSelection" @click="insertRowBelow"></el-button>
++            <el-button size="small" :disabled="!activeSelection" @click="deleteSelectedRows">?</el-button>
++            <el-button size="small" :disabled="!activeSelection" @click="insertColumnLeft"></el-button>
++            <el-button size="small" :disabled="!activeSelection" @click="insertColumnRight"></el-button>
++            <el-button size="small" :disabled="!activeSelection" @click="deleteSelectedColumns">?</el-button>
+           </div>
+         </div>
+ 
++        <div class="style-toolbar">
++          <span class="style-toolbar-title"></span>
++          <el-button size="small" :disabled="!activeSelection" @click="toggleBold"><strong>B</strong></el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="toggleItalic"><em>I</em></el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="toggleUnderline"><span class="underline-btn">U</span></el-button>
++          <el-select
++            class="style-select"
++            size="small"
++            :model-value="fontSizePicker"
++            :disabled="!activeSelection"
++            placeholder=""
++            @change="applyFontSize"
++          >
++            <el-option
++              v-for="size in FONT_SIZE_OPTIONS"
++              :key="`font-size-${size}`"
++              :label="`${size}pt`"
++              :value="`${size}pt`"
++            />
++          </el-select>
++          <el-button size="small" :disabled="!activeSelection" @click="applyHorizontalAlign('left')">?</el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="applyHorizontalAlign('center')"></el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="applyHorizontalAlign('right')">?</el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="applyVerticalAlign('top')">?</el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="applyVerticalAlign('middle')">?</el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="applyVerticalAlign('bottom')">?</el-button>
++          <el-color-picker
++            class="style-color-picker"
++            size="small"
++            v-model="textColorPicker"
++            :disabled="!activeSelection"
++            :show-alpha="false"
++            @active-change="handleTextColorModelValueChange"
++            @update:model-value="handleTextColorModelValueChange"
++            @change="handleTextColorChange"
++          />
++          <el-button size="small" :disabled="!activeSelection" @click="clearTextColor"></el-button>
++          <el-color-picker
++            class="style-color-picker"
++            size="small"
++            v-model="fillColorPicker"
++            :disabled="!activeSelection"
++            :show-alpha="false"
++            @active-change="handleFillColorModelValueChange"
++            @update:model-value="handleFillColorModelValueChange"
++            @change="handleFillColorChange"
++          />
++          <el-button size="small" :disabled="!activeSelection" @click="clearFillColor"></el-button>
++          <el-button
++            size="small"
++            :type="formatPainterActive ? 'primary' : 'default'"
++            :disabled="!canUseFormatPainter"
++            @click="toggleFormatPainter"
++          >
++            ?
++          </el-button>
++          <span class="style-toolbar-title"></span>
++          <el-button size="small" :disabled="!activeSelection" @click="applyBorderToSelection('all')"></el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="applyBorderToSelection('outer')">?</el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="applyBorderToSelection('clear')"></el-button>
++          <span class="style-toolbar-title"></span>
++          <el-button size="small" :disabled="!activeSelection" @click="formatSelectionAsPercent">?</el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="formatSelectionAsDate"></el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="increaseSelectionDecimals"></el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="decreaseSelectionDecimals"></el-button>
++          <span class="style-toolbar-title"></span>
++          <el-button size="small" :disabled="!activeSelection" @click="sortSelection('asc')"></el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="sortSelection('desc')"></el-button>
++          <el-switch v-model="sortHasHeader" size="small" active-text="?" inactive-text="?" />
++          <el-button size="small" :disabled="!activeSelection" @click="openSortDialog"></el-button>
++          <span class="style-toolbar-title"></span>
++          <el-button size="small" :disabled="!activeSelection" @click="toggleAutoFilter"></el-button>
++          <el-button size="small" :disabled="!hasActiveFilter" @click="clearAutoFilter"></el-button>
++          <el-button size="small" :disabled="!canOpenColumnFilter" @click="openColumnFilterDialogBySelection">?</el-button>
++          <span class="style-toolbar-title"></span>
++          <el-button size="small" :disabled="!currentSheet" @click="freezeFirstRow"></el-button>
++          <el-button size="small" :disabled="!currentSheet" @click="freezeFirstColumn"></el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="freezeBySelection">?</el-button>
++          <el-button size="small" :disabled="!currentSheet" @click="openFreezeDialog">?</el-button>
++          <el-button size="small" :disabled="!currentSheet" @click="clearFreezePane"></el-button>
++          <el-button size="small" @click="shortcutDialogVisible = true">?</el-button>
++        </div>
++
++        <div class="formula-toolbar">
++          <span class="formula-label">{{ activeCellLabel }}</span>
++          <el-input
++            v-model="formulaInput"
++            class="formula-input"
++            clearable
++            :disabled="!activePrimaryCell"
++            placeholder=" = ?"
++            @focus="formulaBarFocused = true"
++            @blur="formulaBarFocused = false"
++            @keydown.enter.prevent="applyFormulaBarInput(false)"
++          />
++          <el-button size="small" :disabled="!activePrimaryCell" @click="applyFormulaBarInput(false)"></el-button>
++          <el-button size="small" :disabled="!activeSelection" @click="applyFormulaBarInput(true)"></el-button>
++          <span class="formula-preview">{{ formulaPreview }}</span>
++        </div>
++
+         <el-tabs v-model="activeSheetName" class="sheet-tabs">
+           <el-tab-pane
+             v-for="sheet in sheets"
+@@ -57,6 +169,14 @@
+             :name="sheet.name"
+           />
+         </el-tabs>
++        <div class="sheet-actions">
++          <el-button size="small" @click="createSheet">?</el-button>
++          <el-button size="small" :disabled="!currentSheet" @click="renameCurrentSheet">?</el-button>
++          <el-button size="small" :disabled="!currentSheet" @click="copyCurrentSheet">?</el-button>
++          <el-button size="small" :disabled="!canDeleteCurrentSheet" @click="deleteCurrentSheet">?</el-button>
++          <el-button size="small" :disabled="!currentSheet || !canMoveCurrentSheetLeft" @click="moveCurrentSheetLeft"></el-button>
++          <el-button size="small" :disabled="!currentSheet || !canMoveCurrentSheetRight" @click="moveCurrentSheetRight"></el-button>
++        </div>
+ 
+         <div v-if="currentSheet" class="grid-wrap">
+           <div class="sheet-stage" :style="buildSheetStageStyle(currentSheet)">
+@@ -67,7 +187,7 @@
+                 class="sheet-image-item background"
+                 :style="buildImageStyle(image)"
+               >
+-              <img class="sheet-image" :src="image.src" :alt="image.description || '背景图片'" draggable="false" />
++                <img class="sheet-image" :src="image.src" :alt="image.description || ''" draggable="false" />
+               </div>
+             </div>
+ 
+@@ -80,6 +200,7 @@
+                     :key="`header-col-${columnIndex}`"
+                     class="column-header"
+                     :style="buildColumnHeaderStyle(currentSheet, columnIndex - 1)"
++                    @contextmenu.prevent="openContextMenu($event, { rowIndex: 0, colIndex: columnIndex - 1 })"
+                   >
+                     <span class="column-label">{{ toColumnLabel(columnIndex - 1) }}</span>
+                     <span
+@@ -90,8 +211,8 @@
+                 </tr>
+               </thead>
+               <tbody>
+-                <tr v-for="row in currentSheet.rows" :key="`row-${row.rowIndex}`">
+-                  <td class="row-index" :style="buildRowIndexStyle(row)">
++                <tr v-for="row in visibleRows" :key="`row-${row.rowIndex}`">
++                  <td class="row-index" :style="buildRowIndexStyle(row)" @contextmenu.prevent="openContextMenu($event, { rowIndex: row.rowIndex, colIndex: 0 })">
+                     {{ row.rowIndex + 1 }}
+                     <span
+                       class="resize-handle row-resize-handle"
+@@ -106,7 +227,10 @@
+                     :colspan="cell.colSpan"
+                     :rowspan="cell.rowSpan"
+                     :style="buildCellTdStyle(cell)"
++                    :data-row-index="cell.rowIndex"
++                    :data-col-index="cell.colIndex"
+                     @click="handleCellSelection(cell, $event)"
++                    @contextmenu.prevent="openContextMenu($event, cell)"
+                   >
+                     <template v-if="hasValidationOptions(cell)">
+                       <select
+@@ -114,6 +238,8 @@
+                         class="cell-input cell-select"
+                         :class="{ dirty: cell.dirty, formula: cell.formula }"
+                         :style="buildCellInputStyle(cell)"
++                        @focus="handleCellFocus(cell)"
++                        @blur="handleCellBlur(cell)"
+                         @change="handleCellInput(cell)"
+                       >
+                         <option v-if="cell.validationAllowBlank" value=""></option>
+@@ -141,8 +267,25 @@
+                       :maxlength="MAX_CELL_TEXT_LENGTH"
+                       :wrap="cell.style?.whiteSpace === 'pre-wrap' ? 'soft' : 'off'"
+                       spellcheck="false"
++                      @focus="handleCellFocus(cell)"
++                      @blur="handleCellBlur(cell)"
+                       @input="handleCellInput(cell)"
+                     />
++                    <button
++                      v-if="isFilterHeaderCell(cell)"
++                      type="button"
++                      class="filter-trigger"
++                      title="?"
++                      @click.stop="openColumnFilterDialog(cell.colIndex)"
++                    >
++                      ?
++                    </button>
++                    <span
++                      v-if="isFillHandleCell(cell)"
++                      class="fill-handle"
++                      title=""
++                      @mousedown.stop.prevent="startFillHandleDrag($event)"
++                    ></span>
+                   </td>
+                 </tr>
+               </tbody>
+@@ -155,15 +298,173 @@
+                 class="sheet-image-item anchored"
+                 :style="buildImageStyle(image)"
+               >
+-                <img class="sheet-image" :src="image.src" :alt="image.description || '嵌入图片'" draggable="false" />
++                <img class="sheet-image" :src="image.src" :alt="image.description || ''" draggable="false" />
+               </div>
+             </div>
+           </div>
+         </div>
+       </template>
+ 
+-      <el-empty v-else description="还没有加载可编辑文件，请先在文件管理中选择已上传的 Excel。" />
++      <el-empty v-else description="? Excel?" />
+     </section>
++
++    <el-dialog v-model="findDialogVisible" title="?" width="460px" destroy-on-close>
++      <el-form label-width="92px">
++        <el-form-item label="">
++          <el-input v-model="findForm.findText" placeholder="" />
++        </el-form-item>
++        <el-form-item label="?">
++          <el-input v-model="findForm.replaceText" placeholder="" />
++        </el-form-item>
++        <el-form-item label="">
++          <el-radio-group v-model="findForm.scope">
++            <el-radio label="sheet">?</el-radio>
++            <el-radio label="workbook"></el-radio>
++          </el-radio-group>
++        </el-form-item>
++        <el-form-item label="">
++          <div class="find-options">
++            <el-checkbox v-model="findForm.matchCase">?</el-checkbox>
++            <el-checkbox v-model="findForm.wholeWord"></el-checkbox>
++            <el-checkbox v-model="findForm.selectionOnly" :disabled="!activeSelection || findForm.scope === 'workbook'">
++              ?
++            </el-checkbox>
++          </div>
++        </el-form-item>
++        <el-form-item label="">
++          <el-tag type="info" effect="light"> {{ findPreviewCount }} ?</el-tag>
++        </el-form-item>
++      </el-form>
++      <template #footer>
++        <el-button @click="findDialogVisible = false"></el-button>
++        <el-button @click="previewFindMatches"></el-button>
++        <el-button @click="findNext">?</el-button>
++        <el-button type="primary" :disabled="findPreviewCount <= 0" @click="replaceAll"></el-button>
++      </template>
++    </el-dialog>
++
++    <el-dialog v-model="sortDialogVisible" title="" width="520px" destroy-on-close>
++      <el-form label-width="88px">
++        <el-form-item label="">
++          <el-input :model-value="sortDialogRangeLabel" readonly />
++        </el-form-item>
++        <el-form-item label="">
++          <el-switch v-model="sortDialogHasHeader" active-text="?" inactive-text="?" />
++        </el-form-item>
++      </el-form>
++      <div class="sort-rule-list">
++        <div v-for="(rule, ruleIndex) in sortRules" :key="`sort-rule-${ruleIndex}`" class="sort-rule-item">
++          <el-select v-model="rule.colIndex" size="small" class="sort-rule-column">
++            <el-option
++              v-for="option in sortDialogColumnOptions"
++              :key="`sort-col-${option.colIndex}`"
++              :label="option.label"
++              :value="option.colIndex"
++            />
++          </el-select>
++          <el-select v-model="rule.direction" size="small" class="sort-rule-direction">
++            <el-option label="" value="asc" />
++            <el-option label="" value="desc" />
++          </el-select>
++          <el-button size="small" :disabled="sortRules.length <= 1" @click="removeSortRule(ruleIndex)"></el-button>
++        </div>
++      </div>
++      <template #footer>
++        <el-button @click="addSortRule">?</el-button>
++        <el-button @click="sortDialogVisible = false"></el-button>
++        <el-button type="primary" @click="applySortRules"></el-button>
++      </template>
++    </el-dialog>
++
++    <el-dialog v-model="columnFilterDialogVisible" title="?" width="520px" destroy-on-close>
++      <el-form label-width="88px">
++        <el-form-item label="?">
++          <el-select v-model="filterDialogColIndex" size="small" style="width: 220px" @change="resetFilterCandidateValues">
++            <el-option
++              v-for="option in filterColumnOptions"
++              :key="`filter-col-${option.colIndex}`"
++              :label="option.label"
++              :value="option.colIndex"
++            />
++          </el-select>
++        </el-form-item>
++        <el-form-item label="?">
++          <el-input v-model="filterKeyword" clearable placeholder="" />
++        </el-form-item>
++        <el-form-item label="?">
++          <div class="filter-value-box">
++            <el-checkbox-group v-model="filterSelectedValues">
++              <el-checkbox
++                v-for="item in filteredCandidateValues"
++                :key="`filter-value-${item.value}`"
++                :label="item.value"
++              >
++                {{ item.label }}
++              </el-checkbox>
++            </el-checkbox-group>
++          </div>
++        </el-form-item>
++      </el-form>
++      <template #footer>
++        <el-button @click="selectAllFilterValues"></el-button>
++        <el-button @click="clearFilterValuesSelection">?</el-button>
++        <el-button @click="columnFilterDialogVisible = false"></el-button>
++        <el-button type="primary" @click="applyColumnFilterValues"></el-button>
++      </template>
++    </el-dialog>
++
++    <el-dialog v-model="freezeDialogVisible" title="?" width="420px" destroy-on-close>
++      <el-form label-width="96px">
++        <el-form-item label="">
++          <el-input-number
++            v-model="freezeForm.rows"
++            :min="0"
++            :max="Math.max((currentSheet?.rowCount || 1) - 1, 0)"
++            controls-position="right"
++          />
++        </el-form-item>
++        <el-form-item label="">
++          <el-input-number
++            v-model="freezeForm.cols"
++            :min="0"
++            :max="Math.max((currentSheet?.maxColumnCount || 1) - 1, 0)"
++            controls-position="right"
++          />
++        </el-form-item>
++      </el-form>
++      <template #footer>
++        <el-button @click="freezeDialogVisible = false"></el-button>
++        <el-button type="primary" @click="applyCustomFreezePane"></el-button>
++      </template>
++    </el-dialog>
++
++    <el-dialog v-model="shortcutDialogVisible" title="Excel ?" width="560px" destroy-on-close>
++      <div class="shortcut-grid">
++        <div v-for="item in shortcutList" :key="item.key" class="shortcut-item">
++          <code>{{ item.key }}</code>
++          <span>{{ item.desc }}</span>
++        </div>
++      </div>
++      <template #footer>
++        <el-button type="primary" @click="shortcutDialogVisible = false"></el-button>
++      </template>
++    </el-dialog>
++
++    <div
++      v-if="contextMenuState.visible"
++      class="sheet-context-menu"
++      :style="{ left: `${contextMenuState.x}px`, top: `${contextMenuState.y}px` }"
++    >
++      <button type="button" @click="insertRowAbove"></button>
++      <button type="button" @click="insertRowBelow"></button>
++      <button type="button" @click="deleteSelectedRows">?</button>
++      <button type="button" @click="insertColumnLeft"></button>
++      <button type="button" @click="insertColumnRight"></button>
++      <button type="button" @click="deleteSelectedColumns">?</button>
++      <button type="button" @click="copySelection(false)"></button>
++      <button type="button" @click="copySelection(true)"></button>
++      <button type="button" @click="pasteToSelection"></button>
++    </div>
+   </div>
+ </template>
+ 
+@@ -191,11 +492,35 @@ const COLUMN_HEADER_HEIGHT = 34
+ const ROW_INDEX_WIDTH = 56
+ const MAX_CELL_TEXT_LENGTH = 32767
+ const LOCK_HEARTBEAT_INTERVAL = 30000
++const AUTO_SAVE_INTERVAL = 60000
++const MAX_HISTORY_STEPS = 100
++const DEFAULT_EMPTY_SHEET_ROW_COUNT = 120
++const DEFAULT_EMPTY_SHEET_COLUMN_COUNT = 30
++const BORDER_LINE_STYLE = '1px solid #9CA3AF'
++const MAX_DECIMAL_SCALE = 8
++const EDITABLE_STYLE_KEYS = [
++  'textAlign',
++  'verticalAlign',
++  'color',
++  'backgroundColor',
++  'fontWeight',
++  'fontStyle',
++  'textDecoration',
++  'fontSize',
++  'fontFamily',
++  'whiteSpace',
++  'borderTop',
++  'borderRight',
++  'borderBottom',
++  'borderLeft',
++  'numberFormat'
++]
++const FONT_SIZE_OPTIONS = [10, 11, 12, 14, 16, 18, 20, 24, 28, 32]
+ 
+ const route = useRoute()
+ const router = useRouter()
+ 
+-const workbookName = ref('未加载')
++const workbookName = ref('?')
+ const sheets = ref([])
+ const activeSheetName = ref('')
+ const currentFileName = ref('')
+@@ -217,11 +542,73 @@ const lockState = ref({
+   self: false
+ })
+ const lockHeartbeatTimer = ref(null)
++const autoSaveTimer = ref(null)
+ const lockWarningShown = ref(false)
+ const dirtyRefreshRafId = ref(0)
++const undoStack = ref([])
++const redoStack = ref([])
++const applyingHistory = ref(false)
++const activeEditCellKey = ref('')
++const clipboardPayload = ref(null)
++const pendingStructures = ref([])
++const contextMenuState = ref({
++  visible: false,
++  x: 0,
++  y: 0,
++  rowIndex: 0,
++  colIndex: 0
++})
++const findDialogVisible = ref(false)
++const findForm = ref({
++  findText: '',
++  replaceText: '',
++  scope: 'sheet',
++  matchCase: false,
++  wholeWord: false,
++  selectionOnly: false
++})
++const formatPainterStyle = ref(null)
++const formatPainterActive = ref(false)
++const textColorPicker = ref('#111827')
++const fillColorPicker = ref('#FFFFFF')
++const fontSizePicker = ref('12pt')
++const formulaInput = ref('')
++const formulaBarFocused = ref(false)
++const sortHasHeader = ref(true)
++const sortDialogVisible = ref(false)
++const sortDialogRange = ref(null)
++const sortDialogHasHeader = ref(true)
++const sortRules = ref([])
++const columnFilterDialogVisible = ref(false)
++const filterDialogColIndex = ref(null)
++const filterKeyword = ref('')
++const filterSelectedValues = ref([])
++const freezeDialogVisible = ref(false)
++const freezeForm = ref({
++  rows: 0,
++  cols: 0
++})
++const fillDragState = ref(null)
++const shortcutDialogVisible = ref(false)
++const shortcutList = Object.freeze([
++  { key: 'Ctrl+S', desc: '?' },
++  { key: 'Ctrl+Z / Ctrl+Y', desc: ' / ' },
++  { key: 'Ctrl+C / Ctrl+X / Ctrl+V', desc: ' /  / ' },
++  { key: 'Ctrl+Shift+ArrowDown', desc: '?' },
++  { key: '?', desc: '/?' },
++  { key: 'Ctrl+Shift+L', desc: '?' },
++  { key: 'Alt+S', desc: '' },
++  { key: 'Alt+Shift+ArrowUp / Alt+Shift+ArrowDown', desc: ' / ' },
++  { key: 'Alt+ArrowDown', desc: '?' },
++  { key: 'F2', desc: '?' },
++  { key: 'Ctrl+Enter', desc: '' },
++  { key: 'Ctrl+F / Ctrl+H', desc: ' / ' }
++])
+ 
+ const currentSheet = computed(() => sheets.value.find((sheet) => sheet.name === activeSheetName.value) || null)
+ const hasWorkbook = computed(() => sheets.value.length > 0)
++const canUndo = computed(() => undoStack.value.length > 0)
++const canRedo = computed(() => redoStack.value.length > 0)
+ const activeSelection = computed(() => {
+   if (!selection.value || selection.value.sheetName !== activeSheetName.value) {
+     return null
+@@ -230,9 +617,115 @@ const activeSelection = computed(() => {
+ })
+ const selectionLabel = computed(() => {
+   if (!activeSelection.value) {
+-    return '点击单元格选择，按住 Shift 可扩展选区'
++    return '閻愮懓鍤崡鏇炲帗閺嶅ジ鈧瀚ㄩ敍灞惧瘻娴?Shift 閸欘垱澧跨仦鏇⑩偓澶婂隘'
++  }
++  return `闁灏?${formatSelectionRange(activeSelection.value)}`
++})
++const activePrimaryCell = computed(() => {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range) {
++    return null
++  }
++  return findCellByCoordinate(sheet, range.startRow, range.startCol)
++})
++const activeCellLabel = computed(() => {
++  const range = activeSelection.value
++  if (!range) {
++    return '--'
++  }
++  return `${toColumnLabel(range.startCol)}${range.startRow + 1}`
++})
++const formulaPreview = computed(() => {
++  const cell = activePrimaryCell.value
++  if (!cell) {
++    return '?'
++  }
++  if (!cell.formula) {
++    return cell.value ? `${cell.value}` : '?'
++  }
++  return cell.displayValue ? `?${cell.displayValue}` : '?'
++})
++const visibleRows = computed(() => {
++  const sheet = currentSheet.value
++  if (!sheet || !Array.isArray(sheet.rows)) {
++    return []
++  }
++  const filterConfig = normalizeFilterConfig(sheet.filterConfig)
++  if (!filterConfig.enabled) {
++    return sheet.rows
++  }
++  return sheet.rows.filter((row) => isRowVisibleByFilter(sheet, row.rowIndex, filterConfig))
++})
++const hasActiveFilter = computed(() => {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return false
++  }
++  return normalizeFilterConfig(sheet.filterConfig).enabled
++})
++const canOpenColumnFilter = computed(() => {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return false
++  }
++  const filterConfig = normalizeFilterConfig(sheet.filterConfig)
++  if (!filterConfig.enabled) {
++    return false
++  }
++  const range = activeSelection.value
++  if (!range) {
++    return true
++  }
++  return isColumnInsideFilterRange(range.startCol, filterConfig)
++})
++const sortDialogRangeLabel = computed(() => {
++  const range = sortDialogRange.value
++  if (!range) {
++    return ''
++  }
++  return formatSelectionRange(range)
++})
++const sortDialogColumnOptions = computed(() => {
++  const range = sortDialogRange.value
++  if (!range) {
++    return []
++  }
++  const options = []
++  for (let colIndex = range.startCol; colIndex <= range.endCol; colIndex += 1) {
++    options.push({
++      colIndex,
++      label: `${toColumnLabel(colIndex)} 列`
++    })
++  }
++  return options
++})
++const filterColumnOptions = computed(() => {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return []
++  }
++  const filterConfig = normalizeFilterConfig(sheet.filterConfig)
++  if (!filterConfig.enabled) {
++    return []
++  }
++  const options = []
++  for (let colIndex = filterConfig.startCol; colIndex <= filterConfig.endCol; colIndex += 1) {
++    options.push({
++      colIndex,
++      label: `${toColumnLabel(colIndex)} 列`
++    })
++  }
++  return options
++})
++const filteredCandidateValues = computed(() => {
++  const sheet = currentSheet.value
++  if (!sheet || filterDialogColIndex.value == null) {
++    return []
+   }
+-  return `选区 ${formatSelectionRange(activeSelection.value)}`
++  const allValues = collectFilterCandidateValues(sheet, Number(filterDialogColIndex.value))
++  const keyword = normalizeValue(filterKeyword.value).trim().toLowerCase()
++  return allValues.filter((item) => normalizeValue(item.label).toLowerCase().includes(keyword))
+ })
+ const canMergeSelection = computed(() => {
+   if (!currentSheet.value || !activeSelection.value) {
+@@ -251,21 +744,41 @@ const lockStatusLabel = computed(() => {
+     return ''
+   }
+   if (lockState.value.self) {
+-    return `编辑锁：你（${lockState.value.ownerUsername || '当前用户'}）`
++    return `已锁定（你：${lockState.value.ownerUsername || '当前用户'}）`
+   }
+   if (lockState.value.ownerUsername) {
+-    return `被 ${lockState.value.ownerUsername} 锁定`
++    return `已被 ${lockState.value.ownerUsername} 锁定`
+   }
+   return ''
+ })
++const currentSheetIndex = computed(() => sheets.value.findIndex((sheet) => sheet.name === activeSheetName.value))
++const canDeleteCurrentSheet = computed(() => sheets.value.length > 1 && currentSheetIndex.value >= 0)
++const canMoveCurrentSheetLeft = computed(() => currentSheetIndex.value > 0)
++const canMoveCurrentSheetRight = computed(() => currentSheetIndex.value >= 0 && currentSheetIndex.value < sheets.value.length - 1)
++const canUseFormatPainter = computed(() => Boolean(activePrimaryCell.value))
++const findPreviewCount = computed(() => {
++  const query = normalizeValue(findForm.value.findText).trim()
++  if (!query) {
++    return 0
++  }
++  const matches = collectFindMatches(query, buildFindOptions())
++  return matches.reduce((total, item) => total + Number(item.count || 0), 0)
++})
+ 
+ onMounted(async () => {
++  window.addEventListener('keydown', handleGlobalKeydown, true)
++  window.addEventListener('click', hideContextMenu)
++  startAutoSave()
+   await initializeFromRoute()
+ })
+ 
+ onBeforeUnmount(() => {
++  window.removeEventListener('keydown', handleGlobalKeydown, true)
++  window.removeEventListener('click', hideContextMenu)
++  stopFillHandleDrag(false)
+   cancelDirtyStateRefresh()
+   clearResizeState()
++  stopAutoSave()
+   stopLockHeartbeat()
+   releaseActiveLock(false)
+ })
+@@ -295,9 +808,18 @@ watch(
+ 
+ watch(activeSheetName, () => {
+   clearResizeState()
++  stopFillHandleDrag(false)
++  clearFormatPainterState()
+   clearSelection()
+ })
+ 
++watch(activePrimaryCell, (cell) => {
++  if (formulaBarFocused.value) {
++    return
++  }
++  formulaInput.value = cell ? normalizeValue(cell.value) : ''
++})
++
+ async function initializeFromRoute() {
+   const fileName = normalizeQueryFileName(route.query.fileName)
+   if (fileName) {
+@@ -314,7 +836,7 @@ async function initializeFromRoute() {
+     await loadWorkbookByFileName(fallbackFileName, true)
+   } catch (error) {
+     clearWorkbook()
+-    ElMessage.error(error?.message || '加载文件信息失败')
++    ElMessage.error(error?.message || '閸旂姾娴囬弬鍥︽娣団剝浼呮径杈Е')
+   }
+ }
+ 
+@@ -323,9 +845,9 @@ async function confirmReplaceWorkbook() {
+     return true
+   }
+   try {
+-    await ElMessageBox.confirm('当前工作簿有未保存修改，切换文件会丢失这些改动，是否继续？', '确认切换', {
++    await ElMessageBox.confirm('当前文件有未保存修改，是否继续切换？', '提示', {
+       type: 'warning',
+-      confirmButtonText: '继续',
++      confirmButtonText: '继续切换',
+       cancelButtonText: '取消'
+     })
+     return true
+@@ -334,157 +856,2498 @@ async function confirmReplaceWorkbook() {
+   }
+ }
+ 
+-async function acquireEditorLock(fileName) {
+-  try {
+-    const response = await acquireExcelEditorLock({
+-      fileName,
+-      force: false
+-    })
+-    if (response?.code === 200) {
+-      applyLockState(response?.data || {}, fileName)
+-      startLockHeartbeat()
+-      return true
+-    }
+-    applyLockState(response?.data || {}, fileName)
+-    ElMessage.warning(response?.msg || '该文件正在被其他用户编辑，请稍后再试')
+-    return false
+-  } catch (error) {
+-    ElMessage.error(error?.message || '获取编辑锁失败')
+-    return false
+-  }
++function resetEditingSessionState() {
++  undoStack.value = []
++  redoStack.value = []
++  pendingStructures.value = []
++  activeEditCellKey.value = ''
++  clipboardPayload.value = null
++  formatPainterStyle.value = null
++  formatPainterActive.value = false
++  formulaInput.value = ''
++  formulaBarFocused.value = false
++  sortDialogVisible.value = false
++  sortDialogRange.value = null
++  sortRules.value = []
++  columnFilterDialogVisible.value = false
++  filterDialogColIndex.value = null
++  filterKeyword.value = ''
++  filterSelectedValues.value = []
++  freezeDialogVisible.value = false
++  fillDragState.value = null
++  shortcutDialogVisible.value = false
++  stopFillHandleDrag(false)
++  hideContextMenu()
++}
++
++function captureWorkbookSnapshot() {
++  return JSON.parse(JSON.stringify({
++    sheets: sheets.value,
++    activeSheetName: activeSheetName.value,
++    selection: selection.value,
++    pendingStructures: pendingStructures.value
++  }))
+ }
+ 
+-function applyLockState(lockData, fallbackFileName = '') {
+-  lockState.value = {
+-    fileName: lockData?.fileName || fallbackFileName || '',
+-    ownerUsername: lockData?.ownerUsername || '',
+-    expiresAt: Number(lockData?.expiresAt || 0),
+-    self: Boolean(lockData?.self)
++function restoreWorkbookSnapshot(snapshot) {
++  if (!snapshot) {
++    return
+   }
+-  lockWarningShown.value = false
++  applyingHistory.value = true
++  sheets.value = Array.isArray(snapshot.sheets) ? snapshot.sheets : []
++  activeSheetName.value = snapshot.activeSheetName || sheets.value[0]?.name || ''
++  selection.value = snapshot.selection ? { ...snapshot.selection } : null
++  pendingStructures.value = Array.isArray(snapshot.pendingStructures) ? snapshot.pendingStructures : []
++  for (const sheet of sheets.value) {
++    recomputeSheetFormulaDisplays(sheet)
++    ensureSheetDirtyMetrics(sheet)
++    rebuildSheetRows(sheet)
++  }
++  refreshDirtyState()
++  applyingHistory.value = false
+ }
+ 
+-function resetLockState() {
+-  lockState.value = {
+-    fileName: '',
+-    ownerUsername: '',
+-    expiresAt: 0,
+-    self: false
++function pushUndoSnapshot() {
++  if (applyingHistory.value || !hasWorkbook.value) {
++    return
+   }
+-  lockWarningShown.value = false
++  undoStack.value.push(captureWorkbookSnapshot())
++  if (undoStack.value.length > MAX_HISTORY_STEPS) {
++    undoStack.value.shift()
++  }
++  redoStack.value = []
+ }
+ 
+-function startLockHeartbeat() {
+-  stopLockHeartbeat()
+-  lockHeartbeatTimer.value = setInterval(() => {
+-    heartbeatCurrentLock()
+-  }, LOCK_HEARTBEAT_INTERVAL)
++function undoLastAction() {
++  if (!undoStack.value.length) {
++    return
++  }
++  const snapshot = undoStack.value.pop()
++  redoStack.value.push(captureWorkbookSnapshot())
++  restoreWorkbookSnapshot(snapshot)
+ }
+ 
+-function stopLockHeartbeat() {
+-  if (lockHeartbeatTimer.value) {
+-    clearInterval(lockHeartbeatTimer.value)
+-    lockHeartbeatTimer.value = null
++function redoLastAction() {
++  if (!redoStack.value.length) {
++    return
+   }
++  const snapshot = redoStack.value.pop()
++  undoStack.value.push(captureWorkbookSnapshot())
++  restoreWorkbookSnapshot(snapshot)
+ }
+ 
+-async function heartbeatCurrentLock() {
+-  const fileName = lockState.value.fileName
+-  if (!fileName || !lockState.value.self) {
++function handleGlobalKeydown(event) {
++  if (!hasWorkbook.value) {
+     return
+   }
+-  try {
+-    const response = await heartbeatExcelEditorLock({ fileName })
+-    if (response?.code === 200) {
+-      applyLockState(response?.data || {}, fileName)
++  if (event.isComposing || event.key === 'Process') {
++    return
++  }
++  const typing = isTypingTarget(event.target)
++  const key = String(event.key || '').toLowerCase()
++  const withMeta = event.ctrlKey || event.metaKey
++  const allowTypingShortcut = key === 's'
++    || key === 'enter'
++    || (event.shiftKey && key === 'arrowdown')
++
++  if (withMeta) {
++    if (typing && !allowTypingShortcut) {
+       return
+     }
+-    stopLockHeartbeat()
+-    applyLockState(response?.data || {}, fileName)
+-    if (!lockWarningShown.value) {
+-      lockWarningShown.value = true
+-      ElMessage.warning(response?.msg || '编辑锁已失效')
++    if (key === 'z') {
++      event.preventDefault()
++      if (event.shiftKey) {
++        redoLastAction()
++      } else {
++        undoLastAction()
++      }
++      return
+     }
+-  } catch (error) {
+-    stopLockHeartbeat()
+-    if (!lockWarningShown.value) {
+-      lockWarningShown.value = true
+-      ElMessage.warning(error?.message || '编辑锁心跳失败')
++    if (key === 'y') {
++      event.preventDefault()
++      redoLastAction()
++      return
++    }
++    if (key === 'c') {
++      event.preventDefault()
++      copySelection(false)
++      return
++    }
++    if (key === 'x') {
++      event.preventDefault()
++      copySelection(true)
++      return
++    }
++    if (key === 'v') {
++      event.preventDefault()
++      pasteToSelection()
++      return
++    }
++    if (key === 'f') {
++      event.preventDefault()
++      openFindReplaceDialog()
++      return
++    }
++    if (key === 'h') {
++      event.preventDefault()
++      openFindReplaceDialog()
++      return
++    }
++    if (key === 'enter') {
++      event.preventDefault()
++      applyFormulaBarInput(true)
++      return
++    }
++    if (event.shiftKey && key === 'l') {
++      event.preventDefault()
++      toggleAutoFilter()
++      return
++    }
++    if (event.shiftKey && key === 'arrowdown') {
++      event.preventDefault()
++      selectColumnDownFromActiveCell()
++      return
++    }
++    if (key === 's') {
++      event.preventDefault()
++      saveToServer()
++      return
+     }
+   }
+-}
+ 
+-async function releaseActiveLock(showError = false) {
+-  if (!lockState.value.fileName) {
++  if (!withMeta && event.altKey) {
++    if (key === 's') {
++      event.preventDefault()
++      openSortDialog()
++      return
++    }
++    if (event.shiftKey && key === 'arrowup') {
++      event.preventDefault()
++      sortSelection('asc')
++      return
++    }
++    if (event.shiftKey && key === 'arrowdown') {
++      event.preventDefault()
++      sortSelection('desc')
++      return
++    }
++    if (key === 'arrowdown') {
++      event.preventDefault()
++      openValidationDropdownForSelection()
++      return
++    }
++  }
++
++  if (typing) {
+     return
+   }
+-  await releaseLockByFileName(lockState.value.fileName, showError)
++
++  if (event.key === 'F2') {
++    event.preventDefault()
++    focusActiveCellEditor()
++    return
++  }
++  if (event.key === 'Delete') {
++    event.preventDefault()
++    clearSelectedCellValues()
++    return
++  }
++  if (event.key === 'ArrowUp') {
++    event.preventDefault()
++    moveSelectionBy(-1, 0, event.shiftKey)
++    return
++  }
++  if (event.key === 'ArrowDown') {
++    event.preventDefault()
++    moveSelectionBy(1, 0, event.shiftKey)
++    return
++  }
++  if (event.key === 'ArrowLeft') {
++    event.preventDefault()
++    moveSelectionBy(0, -1, event.shiftKey)
++    return
++  }
++  if (event.key === 'ArrowRight') {
++    event.preventDefault()
++    moveSelectionBy(0, 1, event.shiftKey)
++    return
++  }
++  if (event.key === 'Enter') {
++    event.preventDefault()
++    moveSelectionBy(1, 0, event.shiftKey)
++    return
++  }
++  if (event.key === 'Tab') {
++    event.preventDefault()
++    moveSelectionBy(0, event.shiftKey ? -1 : 1, event.shiftKey)
++  }
+ }
+ 
+-async function releaseLockByFileName(fileName, showError = false) {
+-  if (!fileName) {
++function isTypingTarget(target) {
++  const element = target instanceof HTMLElement ? target : null
++  if (!element) {
++    return false
++  }
++  const tagName = element.tagName
++  if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
++    return true
++  }
++  return element.isContentEditable
++}
++
++function applyFormulaBarInput(fillSelection = false) {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  const targetCell = activePrimaryCell.value
++  if (!sheet || !targetCell) {
+     return
+   }
+-  stopLockHeartbeat()
+-  try {
+-    const response = await releaseExcelEditorLock({ fileName })
+-    if (response?.code !== 200 && showError) {
+-      ElMessage.error(response?.msg || '释放编辑锁失败')
+-    }
+-  } catch (error) {
+-    if (showError) {
+-      ElMessage.error(error?.message || '释放编辑锁失败')
++  const nextValue = normalizeValue(formulaInput.value)
++  pushUndoSnapshot()
++  let applied = 0
++  let invalid = 0
++  const applyForCell = (cell) => {
++    const result = applyCellInputValue(sheet, cell, nextValue, { skipValidation: false })
++    if (result.applied) {
++      applied += 1
++      return
+     }
+-  } finally {
+-    if (lockState.value.fileName === fileName) {
+-      resetLockState()
++    invalid += 1
++  }
++  if (fillSelection && range) {
++    const touched = new Set()
++    for (let rowIndex = range.startRow; rowIndex <= range.endRow; rowIndex += 1) {
++      for (let colIndex = range.startCol; colIndex <= range.endCol; colIndex += 1) {
++        const cell = findCellByCoordinate(sheet, rowIndex, colIndex)
++        if (!cell) {
++          continue
++        }
++        const key = buildCellKey(cell.rowIndex, cell.colIndex)
++        if (touched.has(key)) {
++          continue
++        }
++        touched.add(key)
++        applyForCell(cell)
++      }
+     }
++  } else {
++    applyForCell(targetCell)
++  }
++  if (!applied) {
++    ElMessage.warning('未写入任何单元格')
++    return
++  }
++  recomputeSheetFormulaDisplays(sheet)
++  recountSheetCellDirtyCount(sheet)
++  scheduleDirtyStateRefresh()
++  if (invalid > 0) {
++    ElMessage.warning(`有 ${invalid} 个单元格未通过校验，已跳过`)
+   }
+ }
+ 
+-async function loadWorkbookByFileName(fileName, skipConfirm = false) {
+-  if (!fileName) {
+-    await releaseActiveLock(false)
+-    clearWorkbook()
++function focusActiveCellEditor() {
++  const cell = activePrimaryCell.value
++  if (!cell) {
+     return
+   }
+-  const normalizedFileName = normalizeQueryFileName(fileName)
+-  if (!skipConfirm) {
+-    const confirmed = await confirmReplaceWorkbook()
+-    if (!confirmed) {
+-      return
+-    }
++  const selector = `td.sheet-cell[data-row-index=\"${cell.rowIndex}\"][data-col-index=\"${cell.colIndex}\"] .cell-input`
++  const inputElement = document.querySelector(selector)
++  if (!(inputElement instanceof HTMLElement)) {
++    return
+   }
+-  if (lockState.value.self && lockState.value.fileName && lockState.value.fileName !== normalizedFileName) {
+-    await releaseActiveLock(false)
++  inputElement.focus()
++  if (typeof inputElement.select === 'function') {
++    inputElement.select()
+   }
+-  const lockAcquired = await acquireEditorLock(normalizedFileName)
+-  if (!lockAcquired) {
+-    clearWorkbook()
++}
++
++function openValidationDropdownForSelection() {
++  const cell = activePrimaryCell.value
++  if (!cell || !hasValidationOptions(cell)) {
+     return
+   }
+-  loadingServerFile.value = true
+-  pageLoading.value = true
+-  try {
+-    const response = await getExcelWorkbookView(normalizedFileName)
+-    applyWorkbookView(response?.data || {})
+-    ElMessage.success('文件已加载')
+-  } catch (error) {
+-    await releaseActiveLock(false)
+-    ElMessage.error(error?.message || '加载工作簿失败')
+-  } finally {
+-    loadingServerFile.value = false
+-    pageLoading.value = false
++  const selector = `td.sheet-cell[data-row-index=\"${cell.rowIndex}\"][data-col-index=\"${cell.colIndex}\"] select.cell-select`
++  const selectElement = document.querySelector(selector)
++  if (!(selectElement instanceof HTMLSelectElement)) {
++    return
++  }
++  selectElement.focus()
++  selectElement.click()
++}
++
++function moveSelectionBy(deltaRow, deltaCol, expand = false) {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return
++  }
++  const baseRow = activeSelection.value ? activeSelection.value.startRow : 0
++  const baseCol = activeSelection.value ? activeSelection.value.startCol : 0
++  const nextRow = clampNumber(baseRow + deltaRow, 0, Math.max(sheet.rowCount - 1, 0))
++  const nextCol = clampNumber(baseCol + deltaCol, 0, Math.max(sheet.maxColumnCount - 1, 0))
++  selectCoordinate(nextRow, nextCol, expand)
++}
++
++function selectColumnDownFromActiveCell() {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range) {
++    return
++  }
++  const bottomRow = Math.max(sheet.rowCount - 1, range.endRow)
++  if (range.endRow >= bottomRow) {
++    return
++  }
++  selection.value = {
++    sheetName: sheet.name,
++    anchorStartRow: range.anchorStartRow,
++    anchorEndRow: range.anchorEndRow,
++    anchorStartCol: range.anchorStartCol,
++    anchorEndCol: range.anchorEndCol,
++    startRow: range.startRow,
++    endRow: bottomRow,
++    startCol: range.startCol,
++    endCol: range.endCol
++  }
++}
++
++function selectCoordinate(rowIndex, colIndex, expand = false) {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return
++  }
++  const normalizedRowIndex = clampNumber(rowIndex, 0, Math.max(sheet.rowCount - 1, 0))
++  const normalizedColIndex = clampNumber(colIndex, 0, Math.max(sheet.maxColumnCount - 1, 0))
++  const cell = findCellByCoordinate(sheet, normalizedRowIndex, normalizedColIndex)
++  if (!cell) {
++    return
++  }
++  const range = getCellRange(cell)
++  if (expand && activeSelection.value) {
++    const anchor = activeSelection.value
++    selection.value = {
++      sheetName: sheet.name,
++      anchorStartRow: anchor.anchorStartRow,
++      anchorEndRow: anchor.anchorEndRow,
++      anchorStartCol: anchor.anchorStartCol,
++      anchorEndCol: anchor.anchorEndCol,
++      startRow: Math.min(anchor.anchorStartRow, range.startRow),
++      endRow: Math.max(anchor.anchorEndRow, range.endRow),
++      startCol: Math.min(anchor.anchorStartCol, range.startCol),
++      endCol: Math.max(anchor.anchorEndCol, range.endCol)
++    }
++    return
++  }
++  selection.value = {
++    sheetName: sheet.name,
++    anchorStartRow: range.startRow,
++    anchorEndRow: range.endRow,
++    anchorStartCol: range.startCol,
++    anchorEndCol: range.endCol,
++    startRow: range.startRow,
++    endRow: range.endRow,
++    startCol: range.startCol,
++    endCol: range.endCol
++  }
++}
++
++function handleCellFocus(cell) {
++  const key = buildCellKey(cell.rowIndex, cell.colIndex)
++  if (activeEditCellKey.value === key) {
++    return
++  }
++  pushUndoSnapshot()
++  activeEditCellKey.value = key
++  formulaInput.value = normalizeValue(cell.value)
++}
++
++function handleCellBlur() {
++  activeEditCellKey.value = ''
++  formulaBarFocused.value = false
++}
++
++function clearSelectedCellValues() {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range) {
++    return
++  }
++  pushUndoSnapshot()
++  const touched = new Set()
++  for (let row = range.startRow; row <= range.endRow; row += 1) {
++    for (let col = range.startCol; col <= range.endCol; col += 1) {
++      const cell = findCellByCoordinate(sheet, row, col)
++      if (!cell) {
++        continue
++      }
++      const key = buildCellKey(cell.rowIndex, cell.colIndex)
++      if (touched.has(key)) {
++        continue
++      }
++      touched.add(key)
++      applyCellInputValue(sheet, cell, '', { skipValidation: true })
++    }
++  }
++  recomputeSheetFormulaDisplays(sheet)
++  scheduleDirtyStateRefresh()
++}
++
++async function copySelection(cut = false) {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range) {
++    return
++  }
++  const richMatrix = buildSelectionSnapshotMatrix(sheet, range)
++  const matrix = richMatrix.map((row) => row.map((item) => item.value))
++  const text = matrix.map((row) => row.join('\t')).join('\n')
++  clipboardPayload.value = {
++    mode: cut ? 'cut' : 'copy',
++    source: 'excel-editor',
++    matrix,
++    richMatrix
++  }
++  await writeClipboardText(text)
++  if (cut) {
++    clearSelectedCellValues()
++  }
++  hideContextMenu()
++  ElMessage.success(cut ? '已剪切并清空原单元格' : '已复制到剪贴板')
++}
++
++async function pasteToSelection() {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range) {
++    return
++  }
++  let matrix = Array.isArray(clipboardPayload.value?.matrix) ? clipboardPayload.value.matrix : []
++  let richMatrix = Array.isArray(clipboardPayload.value?.richMatrix) ? clipboardPayload.value.richMatrix : []
++  if (!matrix.length) {
++    const clipboardText = await readClipboardText()
++    if (clipboardText) {
++      matrix = parseClipboardMatrix(clipboardText)
++    }
++  }
++  if (!matrix.length) {
++    ElMessage.warning('剪贴板没有可粘贴内容')
++    return
++  }
++  pushUndoSnapshot()
++  let appliedCount = 0
++  let invalidCount = 0
++  for (let rowOffset = 0; rowOffset < matrix.length; rowOffset += 1) {
++    const rowValues = Array.isArray(matrix[rowOffset]) ? matrix[rowOffset] : []
++    const rowSources = Array.isArray(richMatrix[rowOffset]) ? richMatrix[rowOffset] : []
++    for (let colOffset = 0; colOffset < rowValues.length; colOffset += 1) {
++      const rowIndex = range.startRow + rowOffset
++      const colIndex = range.startCol + colOffset
++      if (rowIndex >= sheet.rowCount || colIndex >= sheet.maxColumnCount) {
++        continue
++      }
++      let cell = findCellByCoordinate(sheet, rowIndex, colIndex)
++      if (!cell) {
++        cell = createSyntheticCell(sheet, rowIndex, colIndex, null, false)
++        sheet.cells.push(cell)
++      }
++      const source = normalizeClipboardCellSource(rowSources[colOffset], rowValues[colOffset])
++      const applied = applyPastedSourceToCell(sheet, cell, source)
++      if (applied) {
++        appliedCount += 1
++      } else {
++        invalidCount += 1
++      }
++    }
++  }
++  if (!appliedCount) {
++    ElMessage.warning('閻╊喗鐖ｉ崠鍝勭厵鐡掑懎鍤ぐ鎾冲鐞涖劍鐗搁懠鍐ㄦ纯')
++    return
++  }
++  recomputeSheetFormulaDisplays(sheet)
++  rebuildSheetRows(sheet)
++  recountSheetCellDirtyCount(sheet)
++  scheduleDirtyStateRefresh()
++  hideContextMenu()
++  if (invalidCount > 0) {
++    ElMessage.warning('閺?' + invalidCount + ' 娑擃亙绗呴幏澶婂礋閸忓啯鐗搁崶鐘烩偓澶愩�嶆稉宥呮値濞夋洝顫︾捄瀹犵箖')
++  }
++}
++
++function buildSelectionMatrix(sheet, range) {
++  const matrix = []
++  for (let row = range.startRow; row <= range.endRow; row += 1) {
++    const rowValues = []
++    for (let col = range.startCol; col <= range.endCol; col += 1) {
++      const cell = findCellByCoordinate(sheet, row, col)
++      rowValues.push(cell ? normalizeValue(cell.value) : '')
++    }
++    matrix.push(rowValues)
++  }
++  return matrix
++}
++
++function buildSelectionSnapshotMatrix(sheet, range) {
++  const matrix = []
++  for (let row = range.startRow; row <= range.endRow; row += 1) {
++    const rowItems = []
++    for (let col = range.startCol; col <= range.endCol; col += 1) {
++      const cell = findCellByCoordinate(sheet, row, col)
++      rowItems.push({
++        value: cell ? normalizeValue(cell.value) : '',
++        formula: Boolean(cell?.formula),
++        displayValue: cell ? normalizeValue(cell.displayValue) : '',
++        style: cell ? cloneCellStyle(cell.style) : {}
++      })
++    }
++    matrix.push(rowItems)
++  }
++  return matrix
++}
++
++function normalizeClipboardCellSource(source, fallbackValue = '') {
++  if (!source || typeof source !== 'object') {
++    return {
++      value: normalizeValue(fallbackValue),
++      formula: false,
++      style: {}
++    }
++  }
++  return {
++    value: normalizeValue(source.value),
++    formula: Boolean(source.formula),
++    style: cloneCellStyle(source.style)
++  }
++}
++
++function applyPastedSourceToCell(sheet, cell, source) {
++  const nextValue = source?.formula ? normalizeValue(source.value) : normalizeValue(source?.value)
++  const result = applyCellInputValue(sheet, cell, nextValue, { skipValidation: false })
++  if (!result.applied) {
++    return false
++  }
++  if (source && source.style && typeof source.style === 'object' && Object.keys(source.style).length > 0) {
++    applyCellStyleChange(sheet, cell, source.style)
++  }
++  return true
++}
++
++function parseClipboardMatrix(text) {
++  return String(text || '')
++    .split(/\r?\n/)
++    .filter((line) => line.length > 0)
++    .map((line) => line.split('\t'))
++}
++
++async function writeClipboardText(text) {
++  if (!navigator?.clipboard?.writeText) {
++    return
++  }
++  try {
++    await navigator.clipboard.writeText(text)
++  } catch {
++    // Ignore browser clipboard permission failure.
++  }
++}
++
++async function readClipboardText() {
++  if (!navigator?.clipboard?.readText) {
++    return ''
++  }
++  try {
++    return await navigator.clipboard.readText()
++  } catch {
++    return ''
++  }
++}
++
++function openContextMenu(event, targetCell) {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return
++  }
++  const targetRow = clampNumber(targetCell?.rowIndex ?? 0, 0, Math.max(sheet.rowCount - 1, 0))
++  const targetCol = clampNumber(targetCell?.colIndex ?? 0, 0, Math.max(sheet.maxColumnCount - 1, 0))
++  const resolvedCell = findCellByCoordinate(sheet, targetRow, targetCol)
++  if (resolvedCell) {
++    handleCellSelection(resolvedCell, {})
++  }
++  contextMenuState.value = {
++    visible: true,
++    x: Number(event.clientX || 0),
++    y: Number(event.clientY || 0),
++    rowIndex: resolvedCell?.rowIndex ?? targetRow,
++    colIndex: resolvedCell?.colIndex ?? targetCol
++  }
++}
++
++function hideContextMenu() {
++  if (!contextMenuState.value.visible) {
++    return
++  }
++  contextMenuState.value.visible = false
++}
++
++function createSheet() {
++  const name = buildUniqueSheetName('Sheet')
++  const nextSheet = createEmptySheet(name)
++  pushUndoSnapshot()
++  sheets.value.push(nextSheet)
++  activeSheetName.value = name
++  pendingStructures.value.push({
++    type: 'sheet',
++    action: 'add',
++    targetSheetName: name,
++    targetIndex: sheets.value.length - 1
++  })
++  scheduleDirtyStateRefresh()
++}
++
++async function renameCurrentSheet() {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return
++  }
++  try {
++    const { value } = await ElMessageBox.prompt('请输入新的工作表名称', '重命名工作表', {
++      confirmButtonText: '确定',
++      cancelButtonText: '取消',
++      inputValue: sheet.name
++    })
++    const nextName = normalizeValue(value).trim()
++    if (!nextName) {
++      ElMessage.warning('?')
++      return
++    }
++    if (sheets.value.some((item) => item.name === nextName && item !== sheet)) {
++      ElMessage.warning('工作表名称已存在')
++      return
++    }
++    if (nextName === sheet.name) {
++      return
++    }
++    pushUndoSnapshot()
++    const previousName = sheet.name
++    sheet.name = nextName
++    activeSheetName.value = nextName
++    pendingStructures.value.push({
++      type: 'sheet',
++      action: 'rename',
++      sheetName: previousName,
++      targetSheetName: nextName
++    })
++    scheduleDirtyStateRefresh()
++  } catch {
++    // Ignore cancel action.
++  }
++}
++
++function copyCurrentSheet() {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return
++  }
++  const copyName = buildUniqueSheetName(`${sheet.name}_副本`)
++  pushUndoSnapshot()
++  const copy = JSON.parse(JSON.stringify(sheet))
++  copy.name = copyName
++  initializeSheetDirtyMetrics(copy)
++  const insertIndex = currentSheetIndex.value + 1
++  sheets.value.splice(insertIndex, 0, copy)
++  activeSheetName.value = copyName
++  pendingStructures.value.push({
++    type: 'sheet',
++    action: 'copy',
++    sheetName: sheet.name,
++    targetSheetName: copyName,
++    targetIndex: insertIndex
++  })
++  scheduleDirtyStateRefresh()
++}
++
++function deleteCurrentSheet() {
++  if (!canDeleteCurrentSheet.value || !currentSheet.value) {
++    return
++  }
++  const deletingSheet = currentSheet.value
++  pushUndoSnapshot()
++  const index = currentSheetIndex.value
++  sheets.value.splice(index, 1)
++  const nextIndex = Math.min(index, sheets.value.length - 1)
++  activeSheetName.value = sheets.value[nextIndex]?.name || ''
++  pendingStructures.value.push({
++    type: 'sheet',
++    action: 'delete',
++    sheetName: deletingSheet.name
++  })
++  scheduleDirtyStateRefresh()
++}
++
++function moveCurrentSheetLeft() {
++  moveCurrentSheetBy(-1)
++}
++
++function moveCurrentSheetRight() {
++  moveCurrentSheetBy(1)
++}
++
++function moveCurrentSheetBy(offset) {
++  if (!currentSheet.value) {
++    return
++  }
++  const sourceIndex = currentSheetIndex.value
++  const targetIndex = sourceIndex + offset
++  if (targetIndex < 0 || targetIndex >= sheets.value.length) {
++    return
++  }
++  pushUndoSnapshot()
++  const [sheet] = sheets.value.splice(sourceIndex, 1)
++  sheets.value.splice(targetIndex, 0, sheet)
++  activeSheetName.value = sheet.name
++  pendingStructures.value.push({
++    type: 'sheet',
++    action: 'reorder',
++    sheetName: sheet.name,
++    targetIndex
++  })
++  scheduleDirtyStateRefresh()
++}
++
++function buildUniqueSheetName(baseName) {
++  const source = normalizeValue(baseName).trim() || 'Sheet'
++  if (!sheets.value.some((sheet) => sheet.name === source)) {
++    return source
++  }
++  let index = 1
++  while (sheets.value.some((sheet) => sheet.name === `${source}${index}`)) {
++    index += 1
++  }
++  return `${source}${index}`
++}
++
++function createEmptySheet(name) {
++  const rowCount = DEFAULT_EMPTY_SHEET_ROW_COUNT
++  const maxColumnCount = DEFAULT_EMPTY_SHEET_COLUMN_COUNT
++  const sheet = {
++    name,
++    rowCount,
++    maxColumnCount,
++    rowHeights: Array.from({ length: rowCount }, () => DEFAULT_ROW_HEIGHT),
++    columnWidths: Array.from({ length: maxColumnCount }, () => DEFAULT_COLUMN_WIDTH),
++    freezePane: normalizeFreezePane(null),
++    filterConfig: normalizeFilterConfig(null),
++    validations: [],
++    images: [],
++    cells: [],
++    rows: [],
++    originalMergeKeys: [],
++    originalRowHeights: Array.from({ length: rowCount }, () => DEFAULT_ROW_HEIGHT),
++    originalColumnWidths: Array.from({ length: maxColumnCount }, () => DEFAULT_COLUMN_WIDTH)
++  }
++  for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
++    for (let colIndex = 0; colIndex < maxColumnCount; colIndex += 1) {
++      sheet.cells.push({
++        rowIndex,
++        colIndex,
++        rowSpan: 1,
++        colSpan: 1,
++        widthPx: DEFAULT_COLUMN_WIDTH,
++        heightPx: DEFAULT_ROW_HEIGHT,
++        value: '',
++        originalValue: '',
++        displayValue: '',
++        formula: false,
++        dirty: false,
++        forceDirty: false,
++        validationOptions: [],
++        validationAllowBlank: true,
++        style: {},
++        originalStyle: {}
++      })
++    }
++  }
++  rebuildSheetRows(sheet)
++  initializeSheetDirtyMetrics(sheet)
++  return sheet
++}
++
++function insertRowAbove() {
++  const range = activeSelection.value
++  if (!range) {
++    return
++  }
++  insertRowsAt(range.startRow, range.endRow - range.startRow + 1)
++  hideContextMenu()
++}
++
++function insertRowBelow() {
++  const range = activeSelection.value
++  if (!range) {
++    return
++  }
++  insertRowsAt(range.endRow + 1, range.endRow - range.startRow + 1)
++  hideContextMenu()
++}
++
++function deleteSelectedRows() {
++  const range = activeSelection.value
++  if (!range) {
++    return
++  }
++  deleteRowsAt(range.startRow, range.endRow - range.startRow + 1)
++  hideContextMenu()
++}
++
++function insertColumnLeft() {
++  const range = activeSelection.value
++  if (!range) {
++    return
++  }
++  insertColumnsAt(range.startCol, range.endCol - range.startCol + 1)
++  hideContextMenu()
++}
++
++function insertColumnRight() {
++  const range = activeSelection.value
++  if (!range) {
++    return
++  }
++  insertColumnsAt(range.endCol + 1, range.endCol - range.startCol + 1)
++  hideContextMenu()
++}
++
++function deleteSelectedColumns() {
++  const range = activeSelection.value
++  if (!range) {
++    return
++  }
++  deleteColumnsAt(range.startCol, range.endCol - range.startCol + 1)
++  hideContextMenu()
++}
++
++function insertRowsAt(startIndex, count) {
++  const sheet = currentSheet.value
++  if (!sheet || count <= 0) {
++    return
++  }
++  const insertIndex = clampNumber(startIndex, 0, Math.max(sheet.rowCount, 0))
++  pushUndoSnapshot()
++  for (const cell of sheet.cells) {
++    const cellEnd = cell.rowIndex + cell.rowSpan - 1
++    if (cell.rowIndex >= insertIndex) {
++      cell.rowIndex += count
++      continue
++    }
++    if (cellEnd >= insertIndex) {
++      cell.rowSpan += count
++    }
++  }
++  for (let offset = 0; offset < count; offset += 1) {
++    sheet.rowHeights.splice(insertIndex, 0, DEFAULT_ROW_HEIGHT)
++    sheet.originalRowHeights.splice(insertIndex, 0, DEFAULT_ROW_HEIGHT)
++  }
++  sheet.rowCount += count
++  pendingStructures.value.push({
++    type: 'row',
++    action: 'insert',
++    sheetName: sheet.name,
++    index: insertIndex,
++    count
++  })
++  ensureSheetDenseGrid(sheet)
++  recountSheetCellDirtyCount(sheet)
++  recountSheetMergeDirtyCount(sheet)
++  rebuildSheetDimensionDirtyIndexes(sheet)
++  resetSheetFilterOnStructureChange(sheet)
++  scheduleDirtyStateRefresh()
++}
++
++function deleteRowsAt(startIndex, count) {
++  const sheet = currentSheet.value
++  if (!sheet || count <= 0 || sheet.rowCount <= count) {
++    ElMessage.warning('')
++    return
++  }
++  const deleteStart = clampNumber(startIndex, 0, Math.max(sheet.rowCount - 1, 0))
++  const deleteCount = Math.min(count, sheet.rowCount - 1 - deleteStart + 1)
++  const deleteEnd = deleteStart + deleteCount - 1
++  pushUndoSnapshot()
++  const nextCells = []
++  for (const cell of sheet.cells) {
++    const cellStart = cell.rowIndex
++    const cellEnd = cell.rowIndex + cell.rowSpan - 1
++    if (cellEnd < deleteStart) {
++      nextCells.push(cell)
++      continue
++    }
++    if (cellStart > deleteEnd) {
++      cell.rowIndex -= deleteCount
++      nextCells.push(cell)
++      continue
++    }
++    if (cellStart < deleteStart && cellEnd > deleteEnd) {
++      cell.rowSpan -= deleteCount
++      nextCells.push(cell)
++      continue
++    }
++    if (cellStart < deleteStart && cellEnd >= deleteStart) {
++      cell.rowSpan = deleteStart - cellStart
++      if (cell.rowSpan > 0) {
++        nextCells.push(cell)
++      }
++      continue
++    }
++    if (cellStart <= deleteEnd && cellEnd > deleteEnd) {
++      cell.rowIndex = deleteStart
++      cell.rowSpan = cellEnd - deleteEnd
++      if (cell.rowSpan > 0) {
++        nextCells.push(cell)
++      }
++    }
++  }
++  sheet.cells = dedupeCells(nextCells)
++  sheet.rowHeights.splice(deleteStart, deleteCount)
++  sheet.originalRowHeights.splice(deleteStart, deleteCount)
++  sheet.rowCount -= deleteCount
++  pendingStructures.value.push({
++    type: 'row',
++    action: 'delete',
++    sheetName: sheet.name,
++    index: deleteStart,
++    count: deleteCount
++  })
++  ensureSheetDenseGrid(sheet)
++  recountSheetCellDirtyCount(sheet)
++  recountSheetMergeDirtyCount(sheet)
++  rebuildSheetDimensionDirtyIndexes(sheet)
++  resetSheetFilterOnStructureChange(sheet)
++  scheduleDirtyStateRefresh()
++}
++
++function insertColumnsAt(startIndex, count) {
++  const sheet = currentSheet.value
++  if (!sheet || count <= 0) {
++    return
++  }
++  const insertIndex = clampNumber(startIndex, 0, Math.max(sheet.maxColumnCount, 0))
++  pushUndoSnapshot()
++  for (const cell of sheet.cells) {
++    const cellEnd = cell.colIndex + cell.colSpan - 1
++    if (cell.colIndex >= insertIndex) {
++      cell.colIndex += count
++      continue
++    }
++    if (cellEnd >= insertIndex) {
++      cell.colSpan += count
++    }
++  }
++  for (let offset = 0; offset < count; offset += 1) {
++    sheet.columnWidths.splice(insertIndex, 0, DEFAULT_COLUMN_WIDTH)
++    sheet.originalColumnWidths.splice(insertIndex, 0, DEFAULT_COLUMN_WIDTH)
++  }
++  sheet.maxColumnCount += count
++  pendingStructures.value.push({
++    type: 'column',
++    action: 'insert',
++    sheetName: sheet.name,
++    index: insertIndex,
++    count
++  })
++  ensureSheetDenseGrid(sheet)
++  recountSheetCellDirtyCount(sheet)
++  recountSheetMergeDirtyCount(sheet)
++  rebuildSheetDimensionDirtyIndexes(sheet)
++  resetSheetFilterOnStructureChange(sheet)
++  scheduleDirtyStateRefresh()
++}
++
++function deleteColumnsAt(startIndex, count) {
++  const sheet = currentSheet.value
++  if (!sheet || count <= 0 || sheet.maxColumnCount <= count) {
++    ElMessage.warning('')
++    return
++  }
++  const deleteStart = clampNumber(startIndex, 0, Math.max(sheet.maxColumnCount - 1, 0))
++  const deleteCount = Math.min(count, sheet.maxColumnCount - 1 - deleteStart + 1)
++  const deleteEnd = deleteStart + deleteCount - 1
++  pushUndoSnapshot()
++  const nextCells = []
++  for (const cell of sheet.cells) {
++    const cellStart = cell.colIndex
++    const cellEnd = cell.colIndex + cell.colSpan - 1
++    if (cellEnd < deleteStart) {
++      nextCells.push(cell)
++      continue
++    }
++    if (cellStart > deleteEnd) {
++      cell.colIndex -= deleteCount
++      nextCells.push(cell)
++      continue
++    }
++    if (cellStart < deleteStart && cellEnd > deleteEnd) {
++      cell.colSpan -= deleteCount
++      nextCells.push(cell)
++      continue
++    }
++    if (cellStart < deleteStart && cellEnd >= deleteStart) {
++      cell.colSpan = deleteStart - cellStart
++      if (cell.colSpan > 0) {
++        nextCells.push(cell)
++      }
++      continue
++    }
++    if (cellStart <= deleteEnd && cellEnd > deleteEnd) {
++      cell.colIndex = deleteStart
++      cell.colSpan = cellEnd - deleteEnd
++      if (cell.colSpan > 0) {
++        nextCells.push(cell)
++      }
++    }
++  }
++  sheet.cells = dedupeCells(nextCells)
++  sheet.columnWidths.splice(deleteStart, deleteCount)
++  sheet.originalColumnWidths.splice(deleteStart, deleteCount)
++  sheet.maxColumnCount -= deleteCount
++  pendingStructures.value.push({
++    type: 'column',
++    action: 'delete',
++    sheetName: sheet.name,
++    index: deleteStart,
++    count: deleteCount
++  })
++  ensureSheetDenseGrid(sheet)
++  recountSheetCellDirtyCount(sheet)
++  recountSheetMergeDirtyCount(sheet)
++  rebuildSheetDimensionDirtyIndexes(sheet)
++  resetSheetFilterOnStructureChange(sheet)
++  scheduleDirtyStateRefresh()
++}
++
++function toggleBold() {
++  toggleStyleToken('fontWeight', '700')
++}
++
++function toggleItalic() {
++  toggleStyleToken('fontStyle', 'italic')
++}
++
++function toggleUnderline() {
++  toggleStyleToken('textDecoration', 'underline')
++}
++
++function toggleStyleToken(key, token) {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range) {
++    return
++  }
++  const cells = getSelectionTopLeftCells(sheet, range)
++  if (!cells.length) {
++    return
++  }
++  const allEnabled = cells.every((cell) => normalizeEditableStyleValue(key, cell?.style?.[key]) === token)
++  applyStyleToSelection({ [key]: allEnabled ? '' : token })
++}
++
++function applyFontSize(value) {
++  fontSizePicker.value = normalizeEditableStyleValue('fontSize', value) || '12pt'
++  applyStyleToSelection({ fontSize: value })
++}
++
++function applyHorizontalAlign(align) {
++  applyStyleToSelection({ textAlign: align })
++}
++
++function applyVerticalAlign(align) {
++  applyStyleToSelection({ verticalAlign: align })
++}
++
++function handleTextColorModelValueChange(color) {
++  applyTextColorChange(color)
++}
++
++function handleTextColorChange(color) {
++  applyTextColorChange(color)
++}
++
++function clearTextColor() {
++  textColorPicker.value = '#111827'
++  applyStyleToSelection({ color: '' })
++}
++
++function handleFillColorModelValueChange(color) {
++  applyFillColorChange(color)
++}
++
++function handleFillColorChange(color) {
++  applyFillColorChange(color)
++}
++
++function clearFillColor() {
++  fillColorPicker.value = '#FFFFFF'
++  applyStyleToSelection({ backgroundColor: '' })
++}
++
++function clearFormatPainterState() {
++  formatPainterActive.value = false
++  formatPainterStyle.value = null
++}
++
++function toggleFormatPainter() {
++  if (formatPainterActive.value) {
++    clearFormatPainterState()
++    return
++  }
++  const sourceCell = activePrimaryCell.value
++  if (!sourceCell) {
++    ElMessage.warning('鐠囧嘲鍘涢柅澶嬪娑撯偓娑擃亜鐢弽鐓庣础閻ㄥ嫬宕熼崗鍐╃壐')
++    return
++  }
++  formatPainterStyle.value = cloneCellStyle(sourceCell.style)
++  formatPainterActive.value = true
++  ElMessage.success('格式刷已就绪，请点击目标区域应用样式')
++}
++
++function applyFormatPainterToRangeIfNeeded(sheet, range) {
++  if (!formatPainterActive.value || !sheet || !range) {
++    return
++  }
++  const stylePatch = cloneCellStyle(formatPainterStyle.value)
++  clearFormatPainterState()
++  if (!stylePatch || typeof stylePatch !== 'object' || !Object.keys(stylePatch).length) {
++    return
++  }
++  applyStylePatchToRange(sheet, range, stylePatch)
++}
++
++function applyBorderToSelection(mode = 'all') {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range) {
++    return
++  }
++  const cells = getSelectionTopLeftCells(sheet, range)
++  if (!cells.length) {
++    return
++  }
++  let changed = 0
++  let pushed = false
++  for (const cell of cells) {
++    const cellRange = getCellRange(cell)
++    const patch = {}
++    if (mode === 'clear') {
++      patch.borderTop = ''
++      patch.borderRight = ''
++      patch.borderBottom = ''
++      patch.borderLeft = ''
++    } else if (mode === 'all') {
++      patch.borderTop = BORDER_LINE_STYLE
++      patch.borderRight = BORDER_LINE_STYLE
++      patch.borderBottom = BORDER_LINE_STYLE
++      patch.borderLeft = BORDER_LINE_STYLE
++    } else if (mode === 'outer') {
++      if (cellRange.startRow === range.startRow) {
++        patch.borderTop = BORDER_LINE_STYLE
++      }
++      if (cellRange.endRow === range.endRow) {
++        patch.borderBottom = BORDER_LINE_STYLE
++      }
++      if (cellRange.startCol === range.startCol) {
++        patch.borderLeft = BORDER_LINE_STYLE
++      }
++      if (cellRange.endCol === range.endCol) {
++        patch.borderRight = BORDER_LINE_STYLE
++      }
++    }
++    if (!Object.keys(patch).length || !willCellStyleChange(cell, patch)) {
++      continue
++    }
++    if (!pushed) {
++      pushUndoSnapshot()
++      pushed = true
++    }
++    applyCellStyleChange(sheet, cell, patch)
++    changed += 1
++  }
++  if (!changed) {
++    return
++  }
++  recountSheetCellDirtyCount(sheet)
++  scheduleDirtyStateRefresh()
++}
++
++function formatSelectionAsPercent() {
++  applyNumericTransformToSelection((valueInfo) => ({
++    value: `${(valueInfo.value * 100).toFixed(Math.max(valueInfo.decimals, 2))}%`,
++    stylePatch: { numberFormat: 'percent' }
++  }))
++}
++
++function formatSelectionAsDate() {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range) {
++    return
++  }
++  const cells = getSelectionTopLeftCells(sheet, range)
++  if (!cells.length) {
++    return
++  }
++  let appliedCount = 0
++  let skippedCount = 0
++  let pushed = false
++  for (const cell of cells) {
++    if (cell.formula) {
++      skippedCount += 1
++      continue
++    }
++    const nextDate = parseDateCellValue(cell.value)
++    if (!nextDate) {
++      skippedCount += 1
++      continue
++    }
++    const nextText = formatDateValue(nextDate)
++    const valueChanged = normalizeValue(cell.value) !== nextText
++    const stylePatch = { numberFormat: 'date' }
++    const styleChanged = willCellStyleChange(cell, stylePatch)
++    if (!valueChanged && !styleChanged) {
++      continue
++    }
++    if (!pushed) {
++      pushUndoSnapshot()
++      pushed = true
++    }
++    if (valueChanged) {
++      const result = applyCellInputValue(sheet, cell, nextText, { skipValidation: true })
++      if (!result.applied) {
++        skippedCount += 1
++        continue
++      }
++    }
++    if (styleChanged) {
++      applyCellStyleChange(sheet, cell, stylePatch)
++    }
++    appliedCount += 1
++  }
++  if (!appliedCount) {
++    ElMessage.info('瑜版挸澧犻柅澶婂隘濞屸剝婀侀崣顖濇祮閹诡澀璐熼弮銉︽埂閻ㄥ嫬宕熼崗鍐╃壐')
++    return
++  }
++  recomputeSheetFormulaDisplays(sheet)
++  recountSheetCellDirtyCount(sheet)
++  scheduleDirtyStateRefresh()
++  if (skippedCount > 0) {
++    ElMessage.success(`已处理 ${appliedCount} 个单元格，跳过 ${skippedCount} 个单元格`)
++  }
++}
++
++function increaseSelectionDecimals() {
++  applyNumericTransformToSelection((valueInfo) => {
++    const decimals = Math.min(valueInfo.decimals + 1, MAX_DECIMAL_SCALE)
++    return {
++      value: formatNumericByDecimals(valueInfo, decimals),
++      stylePatch: { numberFormat: valueInfo.isPercent ? 'percent' : 'number' }
++    }
++  })
++}
++
++function decreaseSelectionDecimals() {
++  applyNumericTransformToSelection((valueInfo) => {
++    const decimals = Math.max(valueInfo.decimals - 1, 0)
++    return {
++      value: formatNumericByDecimals(valueInfo, decimals),
++      stylePatch: { numberFormat: valueInfo.isPercent ? 'percent' : 'number' }
++    }
++  })
++}
++
++function applyNumericTransformToSelection(transformer) {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range || typeof transformer !== 'function') {
++    return
++  }
++  const cells = getSelectionTopLeftCells(sheet, range)
++  if (!cells.length) {
++    return
++  }
++  let appliedCount = 0
++  let skippedCount = 0
++  let pushed = false
++  for (const cell of cells) {
++    if (cell.formula) {
++      skippedCount += 1
++      continue
++    }
++    const valueInfo = parseNumericCellValue(cell.value)
++    if (!valueInfo) {
++      skippedCount += 1
++      continue
++    }
++    const transformed = transformer(valueInfo, cell)
++    if (!transformed || typeof transformed.value === 'undefined') {
++      skippedCount += 1
++      continue
++    }
++    const stylePatch = transformed.stylePatch && typeof transformed.stylePatch === 'object'
++      ? transformed.stylePatch
++      : {}
++    const nextValue = normalizeValue(transformed.value)
++    const valueChanged = normalizeValue(cell.value) !== nextValue
++    const styleChanged = willCellStyleChange(cell, stylePatch)
++    if (!valueChanged && !styleChanged) {
++      continue
++    }
++    if (!pushed) {
++      pushUndoSnapshot()
++      pushed = true
++    }
++    if (valueChanged) {
++      const result = applyCellInputValue(sheet, cell, nextValue, { skipValidation: true })
++      if (!result.applied) {
++        skippedCount += 1
++        continue
++      }
++    }
++    if (styleChanged) {
++      applyCellStyleChange(sheet, cell, stylePatch)
++    }
++    appliedCount += 1
++  }
++  if (!appliedCount) {
++    ElMessage.info('?')
++    return
++  }
++  recomputeSheetFormulaDisplays(sheet)
++  recountSheetCellDirtyCount(sheet)
++  scheduleDirtyStateRefresh()
++  if (skippedCount > 0) {
++    ElMessage.success(`已处理 ${appliedCount} 个单元格，跳过 ${skippedCount} 个单元格`)
++  }
++}
++
++function parseNumericCellValue(value) {
++  const text = normalizeValue(value).trim()
++  if (!text) {
++    return null
++  }
++  const isPercent = text.endsWith('%')
++  const rawNumber = isPercent ? text.slice(0, -1).trim() : text
++  const normalized = rawNumber.replace(/,/g, '')
++  const parsed = Number(normalized)
++  if (!Number.isFinite(parsed)) {
++    return null
++  }
++  const decimals = detectDecimalPlaces(rawNumber)
++  return {
++    source: text,
++    value: isPercent ? parsed / 100 : parsed,
++    decimals,
++    isPercent
++  }
++}
++
++function detectDecimalPlaces(text) {
++  const source = normalizeValue(text).trim()
++  const dotIndex = source.lastIndexOf('.')
++  if (dotIndex < 0) {
++    return 0
++  }
++  const decimalPart = source.slice(dotIndex + 1).replace(/[^0-9]/g, '')
++  return Math.min(decimalPart.length, MAX_DECIMAL_SCALE)
++}
++
++function formatNumericByDecimals(valueInfo, decimals) {
++  const safeDecimals = Math.min(Math.max(Number(decimals || 0), 0), MAX_DECIMAL_SCALE)
++  if (valueInfo.isPercent) {
++    return `${(valueInfo.value * 100).toFixed(safeDecimals)}%`
++  }
++  return Number(valueInfo.value).toFixed(safeDecimals)
++}
++
++function parseDateCellValue(value) {
++  const text = normalizeValue(value).trim()
++  if (!text) {
++    return null
++  }
++  if (/^\d{1,7}$/.test(text)) {
++    const serial = Number(text)
++    if (Number.isFinite(serial) && serial > 0) {
++      return excelSerialToDate(serial)
++    }
++  }
++  const normalized = text.replace(/[./]/g, '-')
++  const date = new Date(normalized)
++  if (Number.isNaN(date.getTime())) {
++    return null
++  }
++  return date
++}
++
++function excelSerialToDate(serial) {
++  const base = Date.UTC(1899, 11, 30)
++  const milliseconds = Math.round(Number(serial) * 24 * 60 * 60 * 1000)
++  return new Date(base + milliseconds)
++}
++
++function formatDateValue(date) {
++  const year = date.getFullYear()
++  const month = String(date.getMonth() + 1).padStart(2, '0')
++  const day = String(date.getDate()).padStart(2, '0')
++  return `${year}-${month}-${day}`
++}
++
++function freezeFirstRow() {
++  applyFreezePane(1, Math.max(Number(currentSheet.value?.freezePane?.xSplit || 0), 0))
++}
++
++function freezeFirstColumn() {
++  applyFreezePane(Math.max(Number(currentSheet.value?.freezePane?.ySplit || 0), 0), 1)
++}
++
++function freezeBySelection() {
++  const range = activeSelection.value
++  if (!range) {
++    ElMessage.warning('')
++    return
++  }
++  applyFreezePane(range.startRow, range.startCol)
++}
++
++function openFreezeDialog() {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return
++  }
++  freezeForm.value = {
++    rows: Math.max(Number(sheet.freezePane?.ySplit || 0), 0),
++    cols: Math.max(Number(sheet.freezePane?.xSplit || 0), 0)
++  }
++  freezeDialogVisible.value = true
++}
++
++function applyCustomFreezePane() {
++  const rows = Math.max(Number(freezeForm.value.rows || 0), 0)
++  const cols = Math.max(Number(freezeForm.value.cols || 0), 0)
++  applyFreezePane(rows, cols)
++  freezeDialogVisible.value = false
++}
++
++function clearFreezePane() {
++  applyFreezePane(0, 0)
++}
++
++function applyFreezePane(rows, cols) {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return
++  }
++  ensureSheetBounds(sheet, sheet.rowCount, sheet.maxColumnCount)
++  const nextRows = clampNumber(rows, 0, Math.max(sheet.rowCount - 1, 0))
++  const nextCols = clampNumber(cols, 0, Math.max(sheet.maxColumnCount - 1, 0))
++  const currentRows = Math.max(Number(sheet.freezePane?.ySplit || 0), 0)
++  const currentCols = Math.max(Number(sheet.freezePane?.xSplit || 0), 0)
++  if (currentRows === nextRows && currentCols === nextCols) {
++    return
++  }
++  sheet.freezePane = normalizeFreezePane({
++    xSplit: nextCols,
++    ySplit: nextRows,
++    leftColumn: nextCols,
++    topRow: nextRows
++  })
++  scheduleDirtyStateRefresh()
++}
++
++function applyTextColorChange(color) {
++  const resolved = resolveColorPickerValue(color, '#111827')
++  textColorPicker.value = resolved.pickerValue
++  if (!resolved.valid) {
++    return
++  }
++  applyStyleToSelection({ color: resolved.styleValue })
++}
++
++function applyFillColorChange(color) {
++  const resolved = resolveColorPickerValue(color, '#FFFFFF')
++  fillColorPicker.value = resolved.pickerValue
++  if (!resolved.valid) {
++    return
++  }
++  applyStyleToSelection({ backgroundColor: resolved.styleValue })
++}
++
++function resolveColorPickerValue(color, fallbackColor) {
++  const raw = normalizeValue(color).trim()
++  if (!raw) {
++    return {
++      valid: true,
++      pickerValue: fallbackColor,
++      styleValue: ''
++    }
++  }
++  const normalized = normalizeColorStyleValue(raw)
++  if (!normalized) {
++    return {
++      valid: false,
++      pickerValue: fallbackColor,
++      styleValue: ''
++    }
++  }
++  return {
++    valid: true,
++    pickerValue: normalized,
++    styleValue: normalized
++  }
++}
++
++function applyStyleToSelection(stylePatch) {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range || !stylePatch || typeof stylePatch !== 'object') {
++    return
++  }
++  applyStylePatchToRange(sheet, range, stylePatch)
++}
++
++function applyStylePatchToRange(sheet, range, stylePatch) {
++  if (!sheet || !range || !stylePatch || typeof stylePatch !== 'object') {
++    return
++  }
++  const cells = getSelectionTopLeftCells(sheet, range)
++  if (!cells.length) {
++    return
++  }
++  const changedCells = cells.filter((cell) => willCellStyleChange(cell, stylePatch))
++  if (!changedCells.length) {
++    return
++  }
++  pushUndoSnapshot()
++  for (const cell of changedCells) {
++    applyCellStyleChange(sheet, cell, stylePatch)
++  }
++  recountSheetCellDirtyCount(sheet)
++  scheduleDirtyStateRefresh()
++}
++
++function willCellStyleChange(cell, stylePatch) {
++  if (!cell || !stylePatch || typeof stylePatch !== 'object') {
++    return false
++  }
++  const sourceStyle = cell.style && typeof cell.style === 'object' ? cell.style : {}
++  for (const [styleKey, styleValue] of Object.entries(stylePatch)) {
++    if (!EDITABLE_STYLE_KEYS.includes(styleKey)) {
++      continue
++    }
++    const current = normalizeEditableStyleValue(styleKey, sourceStyle[styleKey])
++    const next = normalizeEditableStyleValue(styleKey, styleValue)
++    if (current !== next) {
++      return true
++    }
++  }
++  return false
++}
++
++function getSelectionTopLeftCells(sheet, range) {
++  const list = []
++  const dedupe = new Set()
++  for (let rowIndex = range.startRow; rowIndex <= range.endRow; rowIndex += 1) {
++    for (let colIndex = range.startCol; colIndex <= range.endCol; colIndex += 1) {
++      const cell = findCellByCoordinate(sheet, rowIndex, colIndex)
++      if (!cell) {
++        continue
++      }
++      const key = buildCellKey(cell.rowIndex, cell.colIndex)
++      if (dedupe.has(key)) {
++        continue
++      }
++      dedupe.add(key)
++      list.push(cell)
++    }
++  }
++  return list
++}
++
++function sortSelection(direction = 'asc') {
++  const range = activeSelection.value
++  if (!range) {
++    return
++  }
++  sortRangeByRules(range, [{ colIndex: range.startCol, direction }], {
++    hasHeader: sortHasHeader.value,
++    showMessage: true
++  })
++}
++
++function openSortDialog() {
++  const range = activeSelection.value
++  if (!range) {
++    ElMessage.warning('请先选择要排序的区域')
++    return
++  }
++  sortDialogRange.value = { ...range }
++  sortDialogHasHeader.value = Boolean(sortHasHeader.value)
++  sortRules.value = [{ colIndex: range.startCol, direction: 'asc' }]
++  sortDialogVisible.value = true
++}
++
++function addSortRule() {
++  const range = sortDialogRange.value
++  if (!range) {
++    return
++  }
++  const used = new Set(sortRules.value.map((rule) => Number(rule.colIndex)))
++  let candidate = range.startCol
++  while (candidate <= range.endCol && used.has(candidate)) {
++    candidate += 1
++  }
++  if (candidate > range.endCol) {
++    candidate = range.startCol
++  }
++  sortRules.value.push({
++    colIndex: candidate,
++    direction: 'asc'
++  })
++}
++
++function removeSortRule(ruleIndex) {
++  if (sortRules.value.length <= 1) {
++    return
++  }
++  sortRules.value.splice(ruleIndex, 1)
++}
++
++function applySortRules() {
++  const range = sortDialogRange.value
++  if (!range) {
++    return
++  }
++  const success = sortRangeByRules(range, sortRules.value, {
++    hasHeader: sortDialogHasHeader.value,
++    showMessage: true
++  })
++  if (!success) {
++    return
++  }
++  sortHasHeader.value = sortDialogHasHeader.value
++  sortDialogVisible.value = false
++}
++
++function normalizeSortRules(rules, range) {
++  const list = Array.isArray(rules) ? rules : []
++  const normalized = []
++  const used = new Set()
++  for (const rule of list) {
++    const colIndex = Number(rule?.colIndex)
++    if (!Number.isFinite(colIndex) || colIndex < range.startCol || colIndex > range.endCol || used.has(colIndex)) {
++      continue
++    }
++    used.add(colIndex)
++    normalized.push({
++      colIndex,
++      direction: normalizeSortDirection(rule?.direction)
++    })
++  }
++  return normalized
++}
++
++function normalizeSortDirection(direction) {
++  return normalizeValue(direction).toLowerCase() === 'desc' ? 'desc' : 'asc'
++}
++
++function sortRangeByRules(range, rules, options = {}) {
++  const sheet = currentSheet.value
++  if (!sheet || !range) {
++    return false
++  }
++  if (sheet.cells.some((cell) => isMergedCell(cell) && rangesIntersect(range, getCellRange(cell)))) {
++    ElMessage.warning('选区内包含合并单元格，暂不支持排序')
++    return false
++  }
++  const hasHeader = options?.hasHeader !== false
++  const dataStartRow = hasHeader ? range.startRow + 1 : range.startRow
++  if (dataStartRow > range.endRow) {
++    ElMessage.warning('当前选区没有可排序的数据行')
++    return false
++  }
++  const normalizedRules = normalizeSortRules(rules, range)
++  if (!normalizedRules.length) {
++    ElMessage.warning('?')
++    return false
++  }
++  const columnIndexes = []
++  for (let colIndex = range.startCol; colIndex <= range.endCol; colIndex += 1) {
++    columnIndexes.push(colIndex)
++  }
++
++  const sortableRows = []
++  for (let rowIndex = dataStartRow; rowIndex <= range.endRow; rowIndex += 1) {
++    const snapshots = []
++    const sortValues = {}
++    for (const colIndex of columnIndexes) {
++      let cell = findCellByCoordinate(sheet, rowIndex, colIndex)
++      if (!cell) {
++        cell = createSyntheticCell(sheet, rowIndex, colIndex, null, false)
++        sheet.cells.push(cell)
++      }
++      sortValues[colIndex] = normalizeValue(cell.value)
++      snapshots.push(snapshotSortableCell(cell))
++    }
++    sortableRows.push({
++      originalRowIndex: rowIndex,
++      sortValues,
++      snapshots
++    })
++  }
++
++  if (!sortableRows.length) {
++    ElMessage.warning('?')
++    return false
++  }
++
++  pushUndoSnapshot()
++  sortableRows.sort((left, right) => {
++    for (const rule of normalizedRules) {
++      const compareResult = compareSortValues(
++        left.sortValues[rule.colIndex],
++        right.sortValues[rule.colIndex],
++        rule.direction
++      )
++      if (compareResult !== 0) {
++        return compareResult
++      }
++    }
++    return left.originalRowIndex - right.originalRowIndex
++  })
++
++  for (let rowOffset = 0; rowOffset < sortableRows.length; rowOffset += 1) {
++    const targetRowIndex = dataStartRow + rowOffset
++    const rowSnapshot = sortableRows[rowOffset]
++    for (let colOffset = 0; colOffset < columnIndexes.length; colOffset += 1) {
++      const targetColIndex = columnIndexes[colOffset]
++      let targetCell = findCellByCoordinate(sheet, targetRowIndex, targetColIndex)
++      if (!targetCell) {
++        targetCell = createSyntheticCell(sheet, targetRowIndex, targetColIndex, null, false)
++        sheet.cells.push(targetCell)
++      }
++      applySortableSnapshotToCell(sheet, targetCell, rowSnapshot.snapshots[colOffset])
++    }
++  }
++
++  recomputeSheetFormulaDisplays(sheet)
++  rebuildSheetRows(sheet)
++  recountSheetCellDirtyCount(sheet)
++  scheduleDirtyStateRefresh()
++  if (options?.showMessage) {
++    ElMessage.success('排序已完成')
++  }
++  return true
++}
++
++function snapshotSortableCell(cell) {
++  return {
++    value: normalizeValue(cell?.value),
++    displayValue: normalizeValue(cell?.displayValue),
++    formula: Boolean(cell?.formula),
++    style: cloneCellStyle(cell?.style)
++  }
++}
++
++
++function applySortableSnapshotToCell(sheet, cell, snapshot) {
++  const next = snapshot || { value: '', displayValue: '', formula: false, style: {} }
++  cell.formula = Boolean(next.formula)
++  cell.displayValue = normalizeValue(next.displayValue || next.value)
++  cell.style = cloneCellStyle(next.style)
++  applyCellDirtyChange(sheet, cell, normalizeValue(next.value))
++}
++
++function compareSortValues(leftValue, rightValue, direction) {
++  const leftText = normalizeValue(leftValue).trim()
++  const rightText = normalizeValue(rightValue).trim()
++  const leftEmpty = leftText === ''
++  const rightEmpty = rightText === ''
++
++  if (leftEmpty && rightEmpty) {
++    return 0
++  }
++  if (leftEmpty) {
++    return 1
++  }
++  if (rightEmpty) {
++    return -1
++  }
++
++  const leftNumber = Number(leftText)
++  const rightNumber = Number(rightText)
++  const leftIsNumber = !Number.isNaN(leftNumber)
++  const rightIsNumber = !Number.isNaN(rightNumber)
++
++  let compareResult = 0
++  if (leftIsNumber && rightIsNumber) {
++    compareResult = leftNumber - rightNumber
++  } else {
++    compareResult = leftText.localeCompare(rightText, 'zh-CN', { numeric: true, sensitivity: 'base' })
++  }
++  return direction === 'desc' ? -compareResult : compareResult
++}
++
++function isColumnInsideFilterRange(colIndex, filterConfig) {
++  const normalized = normalizeFilterConfig(filterConfig)
++  return colIndex >= normalized.startCol && colIndex <= normalized.endCol
++}
++
++function toggleAutoFilter() {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range) {
++    ElMessage.warning('请先选择要启用筛选的区域')
++    return
++  }
++  const hasHeader = sortHasHeader.value !== false
++  const dataStartRow = hasHeader ? range.startRow + 1 : range.startRow
++  if (dataStartRow > range.endRow) {
++    ElMessage.warning(hasHeader ? '选区仅包含表头，没有可筛选的数据行' : '当前选区没有可筛选的数据行')
++    return
++  }
++  const currentFilter = normalizeFilterConfig(sheet.filterConfig)
++  const sameRange = currentFilter.enabled
++    && currentFilter.hasHeader === hasHeader
++    && currentFilter.headerRow === range.startRow
++    && currentFilter.startCol === range.startCol
++    && currentFilter.endCol === range.endCol
++    && currentFilter.dataStartRow === dataStartRow
++    && currentFilter.dataEndRow === range.endRow
++  if (sameRange) {
++    clearAutoFilter()
++    return
++  }
++  sheet.filterConfig = normalizeFilterConfig({
++    enabled: true,
++    hasHeader,
++    headerRow: range.startRow,
++    startCol: range.startCol,
++    endCol: range.endCol,
++    dataStartRow,
++    dataEndRow: range.endRow,
++    criteria: {}
++  })
++  filterDialogColIndex.value = range.startCol
++  filterKeyword.value = ''
++  filterSelectedValues.value = []
++  ElMessage.success('?')
++}
++
++function clearAutoFilter() {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return
++  }
++  sheet.filterConfig = normalizeFilterConfig(null)
++  columnFilterDialogVisible.value = false
++  filterKeyword.value = ''
++  filterSelectedValues.value = []
++  ElMessage.success('?')
++}
++
++function isFilterHeaderCell(cell) {
++  const sheet = currentSheet.value
++  if (!sheet || !cell) {
++    return false
++  }
++  const filterConfig = normalizeFilterConfig(sheet.filterConfig)
++  if (!filterConfig.enabled) {
++    return false
++  }
++  if (cell.rowIndex !== filterConfig.headerRow) {
++    return false
++  }
++  return isColumnInsideFilterRange(cell.colIndex, filterConfig)
++}
++
++function openColumnFilterDialogBySelection() {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return
++  }
++  const filterConfig = normalizeFilterConfig(sheet.filterConfig)
++  if (!filterConfig.enabled) {
++    ElMessage.warning('')
++    return
++  }
++  const range = activeSelection.value
++  if (range && isColumnInsideFilterRange(range.startCol, filterConfig)) {
++    openColumnFilterDialog(range.startCol)
++    return
++  }
++  openColumnFilterDialog(filterConfig.startCol)
++}
++
++function openColumnFilterDialog(colIndex) {
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return
++  }
++  const filterConfig = normalizeFilterConfig(sheet.filterConfig)
++  if (!filterConfig.enabled) {
++    ElMessage.warning('')
++    return
++  }
++  if (!isColumnInsideFilterRange(colIndex, filterConfig)) {
++    ElMessage.warning('鐠囩兘鈧瀚ㄧ粵娑⑩偓澶婂隘閸╃喎鍞撮惃鍕灙')
++    return
++  }
++  filterDialogColIndex.value = colIndex
++  filterKeyword.value = ''
++  resetFilterCandidateValues()
++  columnFilterDialogVisible.value = true
++}
++
++function resetFilterCandidateValues() {
++  const sheet = currentSheet.value
++  if (!sheet || filterDialogColIndex.value == null) {
++    filterSelectedValues.value = []
++    return
++  }
++  const filterConfig = normalizeFilterConfig(sheet.filterConfig)
++  const colIndex = Number(filterDialogColIndex.value)
++  const candidates = collectFilterCandidateValues(sheet, colIndex).map((item) => item.value)
++  const existed = Array.isArray(filterConfig.criteria[colIndex]) ? filterConfig.criteria[colIndex] : []
++  filterSelectedValues.value = existed.length ? existed.slice() : candidates
++}
++
++function selectAllFilterValues() {
++  const sheet = currentSheet.value
++  if (!sheet || filterDialogColIndex.value == null) {
++    filterSelectedValues.value = []
++    return
++  }
++  filterSelectedValues.value = collectFilterCandidateValues(sheet, Number(filterDialogColIndex.value)).map((item) => item.value)
++}
++
++function clearFilterValuesSelection() {
++  filterSelectedValues.value = []
++}
++
++function applyColumnFilterValues() {
++  const sheet = currentSheet.value
++  if (!sheet || filterDialogColIndex.value == null) {
++    return
++  }
++  const colIndex = Number(filterDialogColIndex.value)
++  const allValues = collectFilterCandidateValues(sheet, colIndex).map((item) => item.value)
++  const selectedValues = Array.from(new Set(filterSelectedValues.value.map((item) => normalizeValue(item))))
++  const nextFilter = normalizeFilterConfig(sheet.filterConfig)
++  const criteria = { ...(nextFilter.criteria || {}) }
++  if (!selectedValues.length || selectedValues.length === allValues.length) {
++    delete criteria[colIndex]
++  } else {
++    criteria[colIndex] = selectedValues
++  }
++  nextFilter.criteria = criteria
++  sheet.filterConfig = nextFilter
++  columnFilterDialogVisible.value = false
++}
++
++function collectFilterCandidateValues(sheet, colIndex) {
++  const filterConfig = normalizeFilterConfig(sheet?.filterConfig)
++  if (!sheet || !filterConfig.enabled) {
++    return []
++  }
++  const values = new Set()
++  for (let rowIndex = filterConfig.dataStartRow; rowIndex <= filterConfig.dataEndRow; rowIndex += 1) {
++    const cell = findCellByCoordinate(sheet, rowIndex, colIndex)
++    values.add(resolveFilterComparableValue(cell))
++  }
++  return Array.from(values)
++    .sort((left, right) => left.localeCompare(right, 'zh-CN', { numeric: true, sensitivity: 'base' }))
++    .map((value) => ({
++      value,
++      label: value || '(缁岃櫣娅?'
++    }))
++}
++
++function isRowVisibleByFilter(sheet, rowIndex, filterConfig) {
++  const normalized = normalizeFilterConfig(filterConfig)
++  if (!normalized.enabled) {
++    return true
++  }
++  if (normalized.hasHeader && rowIndex === normalized.headerRow) {
++    return true
++  }
++  if (rowIndex < normalized.dataStartRow || rowIndex > normalized.dataEndRow) {
++    return true
++  }
++  const criteriaEntries = Object.entries(normalized.criteria || {})
++  for (const [colKey, allowValues] of criteriaEntries) {
++    const values = Array.isArray(allowValues) ? allowValues : []
++    if (!values.length) {
++      continue
++    }
++    const colIndex = Number(colKey)
++    const cell = findCellByCoordinate(sheet, rowIndex, colIndex)
++    const value = resolveFilterComparableValue(cell)
++    if (!values.includes(value)) {
++      return false
++    }
++  }
++  return true
++}
++
++function resolveFilterComparableValue(cell) {
++  if (!cell) {
++    return ''
++  }
++  const display = normalizeValue(cell.displayValue)
++  if (display) {
++    return display
++  }
++  return normalizeValue(cell.value)
++}
++
++function resetSheetFilterOnStructureChange(sheet) {
++  const filterConfig = normalizeFilterConfig(sheet?.filterConfig)
++  if (!filterConfig.enabled) {
++    return
++  }
++  sheet.filterConfig = normalizeFilterConfig(null)
++  filterKeyword.value = ''
++  filterSelectedValues.value = []
++  columnFilterDialogVisible.value = false
++}
++
++function ensureSheetDenseGrid(sheet) {
++  ensureSheetBounds(sheet, sheet.rowCount, sheet.maxColumnCount)
++  const cellMap = new Map()
++  const covered = new Set()
++  for (const cell of sheet.cells) {
++    cellMap.set(buildCellKey(cell.rowIndex, cell.colIndex), cell)
++    if (!isMergedCell(cell)) {
++      continue
++    }
++    for (let rowIndex = cell.rowIndex; rowIndex < cell.rowIndex + cell.rowSpan; rowIndex += 1) {
++      for (let colIndex = cell.colIndex; colIndex < cell.colIndex + cell.colSpan; colIndex += 1) {
++        if (rowIndex === cell.rowIndex && colIndex === cell.colIndex) {
++          continue
++        }
++        covered.add(buildCellKey(rowIndex, colIndex))
++      }
++    }
++  }
++  for (let rowIndex = 0; rowIndex < sheet.rowCount; rowIndex += 1) {
++    for (let colIndex = 0; colIndex < sheet.maxColumnCount; colIndex += 1) {
++      const key = buildCellKey(rowIndex, colIndex)
++      if (covered.has(key) || cellMap.has(key)) {
++        continue
++      }
++      cellMap.set(key, createSyntheticCell(sheet, rowIndex, colIndex, null, false))
++    }
++  }
++  sheet.cells = Array.from(cellMap.values())
++  rebuildSheetRows(sheet)
++}
++
++function openFindReplaceDialog() {
++  findDialogVisible.value = true
++}
++
++function buildFindOptions() {
++  const scope = findForm.value.scope === 'workbook' ? 'workbook' : 'sheet'
++  return {
++    scope,
++    matchCase: Boolean(findForm.value.matchCase),
++    wholeWord: Boolean(findForm.value.wholeWord),
++    selectionOnly: scope === 'sheet' && Boolean(findForm.value.selectionOnly && activeSelection.value)
++  }
++}
++
++function previewFindMatches() {
++  const query = normalizeValue(findForm.value.findText).trim()
++  if (!query) {
++    ElMessage.warning('请输入查找内容')
++    return
++  }
++  ElMessage.info(`预计匹配 ${findPreviewCount.value} 项`)
++}
++
++function findNext() {
++  const query = normalizeValue(findForm.value.findText).trim()
++  if (!query) {
++    ElMessage.warning('请输入查找内容')
++    return
++  }
++  const options = buildFindOptions()
++  const matches = collectFindMatches(query, options)
++  if (!matches.length) {
++    ElMessage.info('鏈壘鍒板尮閰嶉」')
++    return
++  }
++  const selectedKey = activeSelection.value
++    ? `${activeSelection.value.sheetName}:${activeSelection.value.startRow}:${activeSelection.value.startCol}`
++    : ''
++  let matchIndex = matches.findIndex((item) => `${item.sheetName}:${item.rowIndex}:${item.colIndex}` === selectedKey)
++  matchIndex = (matchIndex + 1) % matches.length
++  const nextMatch = matches[matchIndex]
++  activeSheetName.value = nextMatch.sheetName
++  selectCoordinate(nextMatch.rowIndex, nextMatch.colIndex, false)
++  ElMessage.success(`宸插畾浣嶅尮閰嶉」 ${matchIndex + 1}/${matches.length}`)
++}
++
++function replaceAll() {
++  const query = normalizeValue(findForm.value.findText).trim()
++  if (!query) {
++    ElMessage.warning('请输入查找内容')
++    return
++  }
++  const options = buildFindOptions()
++  const matches = collectFindMatches(query, options)
++  if (!matches.length) {
++    ElMessage.info('没有找到可替换项')
++    return
++  }
++  const replacement = normalizeValue(findForm.value.replaceText)
++  let replacedCells = 0
++  let replacedCount = 0
++  const touchedSheets = new Set()
++  let pushed = false
++  for (const match of matches) {
++    const sheet = sheets.value.find((item) => item.name === match.sheetName)
++    if (!sheet) {
++      continue
++    }
++    const cell = findCellAt(sheet, match.rowIndex, match.colIndex)
++    if (!cell) {
++      continue
++    }
++    const replaced = replaceTextWithOptions(normalizeValue(cell.value), query, replacement, options)
++    if (!replaced.count) {
++      continue
++    }
++    if (!pushed) {
++      pushUndoSnapshot()
++      pushed = true
++    }
++    applyCellDirtyChange(sheet, cell, replaced.text)
++    touchedSheets.add(sheet.name)
++    replacedCells += 1
++    replacedCount += replaced.count
++  }
++  if (!replacedCells) {
++    ElMessage.info('没有找到可替换项')
++    return
++  }
++  for (const sheetName of touchedSheets) {
++    const sheet = sheets.value.find((item) => item.name === sheetName)
++    if (!sheet) {
++      continue
++    }
++    recomputeSheetFormulaDisplays(sheet)
++  }
++  scheduleDirtyStateRefresh()
++  ElMessage.success(`已替换 ${replacedCells} 个单元格，共 ${replacedCount} 处匹配`)
++}
++
++function collectFindMatches(query, options = {}) {
++  const safeQuery = normalizeValue(query).trim()
++  if (!safeQuery) {
++    return []
++  }
++  const safeOptions = normalizeFindOptions(options)
++  const matches = []
++  const targetSheets = safeOptions.scope === 'workbook'
++    ? sheets.value
++    : sheets.value.filter((sheet) => sheet.name === activeSheetName.value)
++  const selectionScope = safeOptions.selectionOnly ? activeSelection.value : null
++  if (safeOptions.selectionOnly && !selectionScope) {
++    return []
++  }
++  for (const sheet of targetSheets) {
++    for (const cell of sheet.cells) {
++      if (selectionScope && sheet.name !== selectionScope.sheetName) {
++        continue
++      }
++      if (selectionScope && !isCoordinateInsideRange(cell.rowIndex, cell.colIndex, selectionScope)) {
++        continue
++      }
++      const hitCount = countTextMatches(normalizeValue(cell.value), safeQuery, safeOptions)
++      if (!hitCount) {
++        continue
++      }
++      matches.push({
++        sheetName: sheet.name,
++        rowIndex: cell.rowIndex,
++        colIndex: cell.colIndex,
++        count: hitCount
++      })
++    }
++  }
++  return matches
++}
++
++function normalizeFindOptions(options) {
++  return {
++    scope: options?.scope === 'workbook' ? 'workbook' : 'sheet',
++    matchCase: Boolean(options?.matchCase),
++    wholeWord: Boolean(options?.wholeWord),
++    selectionOnly: Boolean(options?.selectionOnly)
++  }
++}
++
++function countTextMatches(text, query, options = {}) {
++  const source = normalizeValue(text)
++  const regex = buildFindRegExp(query, options, true)
++  if (!regex) {
++    return 0
++  }
++  let count = 0
++  let matched
++  while ((matched = regex.exec(source)) != null) {
++    count += 1
++    if (matched[0] === '') {
++      regex.lastIndex += 1
++    }
++  }
++  return count
++}
++
++function replaceTextWithOptions(text, query, replacement, options = {}) {
++  const source = normalizeValue(text)
++  const regex = buildFindRegExp(query, options, true)
++  if (!regex) {
++    return { text: source, count: 0 }
++  }
++  let count = 0
++  if (normalizeFindOptions(options).wholeWord) {
++    const nextText = source.replace(regex, (_, prefix = '') => {
++      count += 1
++      return `${prefix}${replacement}`
++    })
++    return { text: nextText, count }
++  }
++  const nextText = source.replace(regex, () => {
++    count += 1
++    return replacement
++  })
++  return { text: nextText, count }
++}
++
++function buildFindRegExp(query, options = {}, global = true) {
++  const safeQuery = normalizeValue(query)
++  if (!safeQuery) {
++    return null
++  }
++  const escaped = escapeRegExp(safeQuery)
++  const safeOptions = normalizeFindOptions(options)
++  const flags = `${global ? 'g' : ''}${safeOptions.matchCase ? '' : 'i'}`
++  if (safeOptions.wholeWord) {
++    return new RegExp(`(^|[^0-9A-Za-z_])(${escaped})(?=$|[^0-9A-Za-z_])`, flags)
++  }
++  return new RegExp(escaped, flags)
++}
++
++function isCoordinateInsideRange(rowIndex, colIndex, range) {
++  if (!range) {
++    return false
++  }
++  return rowIndex >= range.startRow
++    && rowIndex <= range.endRow
++    && colIndex >= range.startCol
++    && colIndex <= range.endCol
++}
++
++function escapeRegExp(input) {
++  return normalizeValue(input).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
++}
++
++function clampNumber(value, min, max) {
++  return Math.min(Math.max(Number(value || min), min), max)
++}
++
++async function acquireEditorLock(fileName) {
++  try {
++    const response = await acquireExcelEditorLock({
++      fileName,
++      force: false
++    })
++    if (response?.code === 200) {
++      applyLockState(response?.data || {}, fileName)
++      startLockHeartbeat()
++      return true
++    }
++    applyLockState(response?.data || {}, fileName)
++    ElMessage.warning(response?.msg || '文件已被其他用户锁定，当前为只读模式')
++    return false
++  } catch (error) {
++    ElMessage.error(error?.message || '?')
++    return false
++  }
++}
++
++function applyLockState(lockData, fallbackFileName = '') {
++  lockState.value = {
++    fileName: lockData?.fileName || fallbackFileName || '',
++    ownerUsername: lockData?.ownerUsername || '',
++    expiresAt: Number(lockData?.expiresAt || 0),
++    self: Boolean(lockData?.self)
++  }
++  lockWarningShown.value = false
++}
++
++function resetLockState() {
++  lockState.value = {
++    fileName: '',
++    ownerUsername: '',
++    expiresAt: 0,
++    self: false
++  }
++  lockWarningShown.value = false
++}
++
++function startLockHeartbeat() {
++  stopLockHeartbeat()
++  lockHeartbeatTimer.value = setInterval(() => {
++    heartbeatCurrentLock()
++  }, LOCK_HEARTBEAT_INTERVAL)
++}
++
++function startAutoSave() {
++  stopAutoSave()
++  autoSaveTimer.value = setInterval(() => {
++    triggerAutoSave()
++  }, AUTO_SAVE_INTERVAL)
++}
++
++function stopAutoSave() {
++  if (autoSaveTimer.value) {
++    clearInterval(autoSaveTimer.value)
++    autoSaveTimer.value = null
++  }
++}
++
++async function triggerAutoSave() {
++  if (!hasWorkbook.value || !isDirty.value || !currentFileName.value) {
++    return
++  }
++  if (activeEditCellKey.value) {
++    return
++  }
++  if (!lockState.value.self || lockState.value.fileName !== currentFileName.value) {
++    return
++  }
++  if (saving.value || pageLoading.value) {
++    return
++  }
++  await saveToServer({ silent: true, commitLocal: true })
++}
++
++function stopLockHeartbeat() {
++  if (lockHeartbeatTimer.value) {
++    clearInterval(lockHeartbeatTimer.value)
++    lockHeartbeatTimer.value = null
++  }
++}
++
++async function heartbeatCurrentLock() {
++  const fileName = lockState.value.fileName
++  if (!fileName || !lockState.value.self) {
++    return
++  }
++  try {
++    const response = await heartbeatExcelEditorLock({ fileName })
++    if (response?.code === 200) {
++      applyLockState(response?.data || {}, fileName)
++      return
++    }
++    stopLockHeartbeat()
++    applyLockState(response?.data || {}, fileName)
++    if (!lockWarningShown.value) {
++      lockWarningShown.value = true
++      ElMessage.warning(response?.msg || '文件锁已失效，请重新打开文件')
++    }
++  } catch (error) {
++    stopLockHeartbeat()
++    if (!lockWarningShown.value) {
++      lockWarningShown.value = true
++      ElMessage.warning(error?.message || '?')
++    }
++  }
++}
++
++async function releaseActiveLock(showError = false) {
++  if (!lockState.value.fileName) {
++    return
++  }
++  await releaseLockByFileName(lockState.value.fileName, showError)
++}
++
++async function releaseLockByFileName(fileName, showError = false) {
++  if (!fileName) {
++    return
++  }
++  stopLockHeartbeat()
++  try {
++    const response = await releaseExcelEditorLock({ fileName })
++    if (response?.code !== 200 && showError) {
++      ElMessage.error(response?.msg || '?')
++    }
++  } catch (error) {
++    if (showError) {
++      ElMessage.error(error?.message || '?')
++    }
++  } finally {
++    if (lockState.value.fileName === fileName) {
++      resetLockState()
++    }
++  }
++}
++
++async function loadWorkbookByFileName(fileName, skipConfirm = false, options = {}) {
++  const notify = options?.notify !== false
++  if (!fileName) {
++    await releaseActiveLock(false)
++    clearWorkbook()
++    return
++  }
++  const normalizedFileName = normalizeQueryFileName(fileName)
++  if (!skipConfirm) {
++    const confirmed = await confirmReplaceWorkbook()
++    if (!confirmed) {
++      return
++    }
++  }
++  if (lockState.value.self && lockState.value.fileName && lockState.value.fileName !== normalizedFileName) {
++    await releaseActiveLock(false)
++  }
++  const lockAcquired = await acquireEditorLock(normalizedFileName)
++  if (!lockAcquired) {
++    clearWorkbook()
++    return
++  }
++  loadingServerFile.value = true
++  pageLoading.value = true
++  try {
++    const response = await getExcelWorkbookView(normalizedFileName)
++    applyWorkbookView(response?.data || {})
++    if (notify) {
++      ElMessage.success('?')
++    }
++  } catch (error) {
++    await releaseActiveLock(false)
++    if (notify) {
++      ElMessage.error(error?.message || '?')
++    }
++  } finally {
++    loadingServerFile.value = false
++    pageLoading.value = false
+   }
+ }
+ 
+ function applyWorkbookView(data) {
++  resetEditingSessionState()
+   const nextSheets = Array.isArray(data?.sheets) ? data.sheets.map(normalizeSheet) : []
+   sheets.value = nextSheets
+   activeSheetName.value = nextSheets[0]?.name || ''
+   currentFileName.value = data?.currentFileName || data?.fileName || ''
+   currentWorkbookVersion.value = data?.version ? String(data.version) : ''
+-  workbookName.value = data?.fileName || currentFileName.value || '未加载'
++  workbookName.value = data?.fileName || currentFileName.value || '?'
+   clearSelection()
+   refreshDirtyState()
+ }
+@@ -497,12 +3360,13 @@ function normalizeSheet(sheet) {
+   const images = normalizeImages(sheet?.images)
+   const validations = normalizeValidations(sheet?.validations)
+   const freezePane = normalizeFreezePane(sheet?.freezePane)
+-  let rowCount = Math.max(Number(sheet?.rowCount ?? 0), 1)
+-  let maxColumnCount = Math.max(Number(sheet?.maxColumnCount ?? 0), 1)
++  const filterConfig = normalizeFilterConfig(sheet?.filterConfig)
++  let rowCount = Math.max(Number(sheet?.rowCount || 0), 1)
++  let maxColumnCount = Math.max(Number(sheet?.maxColumnCount || 0), 1)
+   const sourceRows = Array.isArray(sheet?.rows) ? sheet.rows : []
+ 
+   for (const sourceRow of sourceRows) {
+-    const rowIndex = Math.max(Number(sourceRow?.rowIndex ?? 0), 0)
++    const rowIndex = Math.max(Number(sourceRow?.rowIndex || 0), 0)
+     rowCount = Math.max(rowCount, rowIndex + 1)
+     ensureArraySize(rowHeights, rowIndex + 1, DEFAULT_ROW_HEIGHT)
+     rowHeights[rowIndex] = normalizeRowHeight(sourceRow?.heightPx)
+@@ -533,6 +3397,7 @@ function normalizeSheet(sheet) {
+     rowHeights,
+     columnWidths,
+     freezePane,
++    filterConfig,
+     validations,
+     images,
+     cells: dedupeCells(cells),
+@@ -543,6 +3408,7 @@ function normalizeSheet(sheet) {
+   }
+ 
+   rebuildSheetRows(normalized)
++  recomputeSheetFormulaDisplays(normalized)
+   normalized.originalMergeKeys = collectSheetMergeKeys(normalized)
+   normalized.originalRowHeights = normalized.rowHeights.map((height) => Math.round(Number(height)))
+   normalized.originalColumnWidths = normalized.columnWidths.map((width) => Math.round(Number(width)))
+@@ -552,11 +3418,12 @@ function normalizeSheet(sheet) {
+ 
+ function normalizeCell(cell) {
+   const value = cell?.value == null ? '' : String(cell.value)
++  const style = cloneCellStyle(cell?.style)
+   return {
+-    rowIndex: Math.max(Number(cell?.rowIndex ?? 0), 0),
+-    colIndex: Math.max(Number(cell?.colIndex ?? 0), 0),
+-    rowSpan: Math.max(Number(cell?.rowSpan ?? 1), 1),
+-    colSpan: Math.max(Number(cell?.colSpan ?? 1), 1),
++    rowIndex: Math.max(Number(cell?.rowIndex || 0), 0),
++    colIndex: Math.max(Number(cell?.colIndex || 0), 0),
++    rowSpan: Math.max(Number(cell?.rowSpan || 1), 1),
++    colSpan: Math.max(Number(cell?.colSpan || 1), 1),
+     widthPx: Math.max(Number(cell?.widthPx ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH),
+     heightPx: Math.max(Number(cell?.heightPx ?? DEFAULT_CELL_HEIGHT), MIN_ROW_HEIGHT),
+     value,
+@@ -567,16 +3434,51 @@ function normalizeCell(cell) {
+     forceDirty: false,
+     validationOptions: [],
+     validationAllowBlank: true,
+-    style: typeof cell?.style === 'object' && cell.style ? { ...cell.style } : {}
++    style,
++    originalStyle: cloneCellStyle(style)
+   }
+ }
+ 
+ function normalizeFreezePane(freezePane) {
+   return {
+-    xSplit: Math.max(Number(freezePane?.xSplit ?? 0), 0),
+-    ySplit: Math.max(Number(freezePane?.ySplit ?? 0), 0),
+-    leftColumn: Math.max(Number(freezePane?.leftColumn ?? 0), 0),
+-    topRow: Math.max(Number(freezePane?.topRow ?? 0), 0)
++    xSplit: Math.max(Number(freezePane?.xSplit || 0), 0),
++    ySplit: Math.max(Number(freezePane?.ySplit || 0), 0),
++    leftColumn: Math.max(Number(freezePane?.leftColumn || 0), 0),
++    topRow: Math.max(Number(freezePane?.topRow || 0), 0)
++  }
++}
++
++function normalizeFilterConfig(filterConfig) {
++  const source = filterConfig && typeof filterConfig === 'object' ? filterConfig : {}
++  const hasHeader = source.hasHeader !== false
++  const criteria = {}
++  const rawCriteria = source.criteria && typeof source.criteria === 'object' ? source.criteria : {}
++  for (const [key, values] of Object.entries(rawCriteria)) {
++    const colIndex = Number(key)
++    if (!Number.isFinite(colIndex) || colIndex < 0) {
++      continue
++    }
++    const normalizedValues = Array.isArray(values)
++      ? Array.from(new Set(values.map((value) => normalizeValue(value))))
++      : []
++    criteria[colIndex] = normalizedValues
++  }
++  const startCol = Math.max(Number(source.startCol || 0), 0)
++  const endCol = Math.max(Number(source.endCol || startCol), startCol)
++  const headerRow = Math.max(Number(source.headerRow || 0), 0)
++  const minDataStartRow = hasHeader ? headerRow + 1 : headerRow
++  const defaultDataStartRow = hasHeader ? headerRow + 1 : headerRow
++  const dataStartRow = Math.max(Number(source.dataStartRow || defaultDataStartRow), minDataStartRow)
++  const dataEndRow = Math.max(Number(source.dataEndRow || dataStartRow), dataStartRow)
++  return {
++    enabled: Boolean(source.enabled),
++    hasHeader,
++    headerRow,
++    startCol,
++    endCol,
++    dataStartRow,
++    dataEndRow,
++    criteria
+   }
+ }
+ 
+@@ -584,31 +3486,53 @@ function normalizeValidations(validations) {
+   const source = Array.isArray(validations) ? validations : []
+   return source
+     .map((item) => ({
+-      firstRow: Math.max(Number(item?.firstRow ?? 0), 0),
+-      lastRow: Math.max(Number(item?.lastRow ?? 0), 0),
+-      firstColumn: Math.max(Number(item?.firstColumn ?? 0), 0),
+-      lastColumn: Math.max(Number(item?.lastColumn ?? 0), 0),
++      firstRow: Math.max(Number(item?.firstRow || 0), 0),
++      lastRow: Math.max(Number(item?.lastRow || 0), 0),
++      firstColumn: Math.max(Number(item?.firstColumn || 0), 0),
++      lastColumn: Math.max(Number(item?.lastColumn || 0), 0),
+       allowBlank: item?.allowBlank !== false,
+-      options: Array.isArray(item?.options) ? item.options.map((option) => String(option)) : []
++      options: normalizeValidationOptions(item?.options)
+     }))
+     .filter((item) => item.options.length > 0)
+ }
+ 
++function normalizeValidationOptions(options) {
++  const source = Array.isArray(options) ? options : []
++  const flattened = []
++  for (const option of source) {
++    const raw = normalizeValue(option).trim()
++    if (!raw) {
++      continue
++    }
++    if (raw.includes(',') || raw.includes('，') || raw.includes(';') || raw.includes('；') || raw.includes('\n')) {
++      for (const item of raw.split(/[,\n，;；]/)) {
++        const text = normalizeValue(item).trim()
++        if (text) {
++          flattened.push(text)
++        }
++      }
++      continue
++    }
++    flattened.push(raw)
++  }
++  return Array.from(new Set(flattened))
++}
++
+ function normalizeImages(images) {
+   const source = Array.isArray(images) ? images : []
+   return source
+     .map((item) => ({
+       kind: item?.kind === 'background' ? 'background' : 'anchored',
+-      row1: Math.max(Number(item?.row1 ?? 0), 0),
+-      col1: Math.max(Number(item?.col1 ?? 0), 0),
+-      row2: Math.max(Number(item?.row2 ?? 0), 0),
+-      col2: Math.max(Number(item?.col2 ?? 0), 0),
+-      dx1Px: Math.max(Number(item?.dx1Px ?? 0), 0),
+-      dx2Px: Math.max(Number(item?.dx2Px ?? 0), 0),
+-      dy1Px: Math.max(Number(item?.dy1Px ?? 0), 0),
+-      dy2Px: Math.max(Number(item?.dy2Px ?? 0), 0),
+-      widthPx: Math.max(Number(item?.widthPx ?? 0), 1),
+-      heightPx: Math.max(Number(item?.heightPx ?? 0), 1),
++      row1: Math.max(Number(item?.row1 || 0), 0),
++      col1: Math.max(Number(item?.col1 || 0), 0),
++      row2: Math.max(Number(item?.row2 || 0), 0),
++      col2: Math.max(Number(item?.col2 || 0), 0),
++      dx1Px: Math.max(Number(item?.dx1Px || 0), 0),
++      dx2Px: Math.max(Number(item?.dx2Px || 0), 0),
++      dy1Px: Math.max(Number(item?.dy1Px || 0), 0),
++      dy2Px: Math.max(Number(item?.dy2Px || 0), 0),
++      widthPx: Math.max(Number(item?.widthPx || 0), 1),
++      heightPx: Math.max(Number(item?.heightPx || 0), 1),
+       src: item?.src ? String(item.src) : '',
+       mimeType: item?.mimeType ? String(item.mimeType) : '',
+       extension: item?.extension ? String(item.extension) : '',
+@@ -618,7 +3542,7 @@ function normalizeImages(images) {
+ }
+ 
+ function normalizeRowHeight(value) {
+-  return Math.max(Number(value ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
++  return Math.max(Number(value || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+ }
+ 
+ function applyColumnWidthHint(columnWidths, cell) {
+@@ -638,7 +3562,8 @@ function applyColumnWidthHint(columnWidths, cell) {
+ function clearWorkbook() {
+   releaseActiveLock(false)
+   cancelDirtyStateRefresh()
+-  workbookName.value = '未加载'
++  resetEditingSessionState()
++  workbookName.value = '?'
+   sheets.value = []
+   activeSheetName.value = ''
+   currentFileName.value = ''
+@@ -650,6 +3575,9 @@ function clearWorkbook() {
+ 
+ function clearSelection() {
+   selection.value = null
++  if (formatPainterActive.value) {
++    clearFormatPainterState()
++  }
+ }
+ 
+ function handleCellInput(cell) {
+@@ -657,35 +3585,34 @@ function handleCellInput(cell) {
+   if (normalized.length > MAX_CELL_TEXT_LENGTH) {
+     cell.value = normalized.slice(0, MAX_CELL_TEXT_LENGTH)
+     if (!showedCellLimitHint.value) {
+-      ElMessage.warning(`单元格内容超过 Excel 限制，已截断至 ${MAX_CELL_TEXT_LENGTH} 个字符`)
++      ElMessage.warning('閸楁洖鍘撻弽鐓庡敶鐎圭绉撮崙?Excel 闂勬劕鍩楅敍灞藉嚒閼奉亜濮╅幋顏呮焽')
+       showedCellLimitHint.value = true
+     }
+   }
+-  const wasDirty = Boolean(cell.dirty)
+-  const nextDirty = cell.forceDirty || normalizeValue(cell.value) !== normalizeValue(cell.originalValue)
+-  cell.dirty = nextDirty
+-  if (wasDirty !== nextDirty) {
+-    const sheet = currentSheet.value
+-    if (sheet) {
+-      ensureSheetDirtyMetrics(sheet)
+-      sheet.cellDirtyCount += nextDirty ? 1 : -1
+-      if (sheet.cellDirtyCount < 0) {
+-        sheet.cellDirtyCount = 0
+-      }
+-    }
++  const sheet = currentSheet.value
++  if (!sheet) {
++    return
++  }
++  const result = applyCellInputValue(sheet, cell, cell.value, { skipValidation: false })
++  if (!result.applied) {
++    return
+   }
++  recomputeSheetFormulaDisplays(sheet)
+   scheduleDirtyStateRefresh()
+ }
+ 
+ function handleCellSelection(cell, event) {
+-  if (!currentSheet.value) {
++  const sheet = currentSheet.value
++  if (!sheet) {
+     return
+   }
++  stopFillHandleDrag(false)
++  hideContextMenu()
+   const cellRange = getCellRange(cell)
+   if (event?.shiftKey && activeSelection.value) {
+     const anchor = activeSelection.value
+     selection.value = {
+-      sheetName: currentSheet.value.name,
++      sheetName: sheet.name,
+       anchorStartRow: anchor.anchorStartRow,
+       anchorEndRow: anchor.anchorEndRow,
+       anchorStartCol: anchor.anchorStartCol,
+@@ -695,10 +3622,11 @@ function handleCellSelection(cell, event) {
+       startCol: Math.min(anchor.anchorStartCol, cellRange.startCol),
+       endCol: Math.max(anchor.anchorEndCol, cellRange.endCol)
+     }
++    applyFormatPainterToRangeIfNeeded(sheet, selection.value)
+     return
+   }
+   selection.value = {
+-    sheetName: currentSheet.value.name,
++    sheetName: sheet.name,
+     anchorStartRow: cellRange.startRow,
+     anchorEndRow: cellRange.endRow,
+     anchorStartCol: cellRange.startCol,
+@@ -708,6 +3636,7 @@ function handleCellSelection(cell, event) {
+     startCol: cellRange.startCol,
+     endCol: cellRange.endCol
+   }
++  applyFormatPainterToRangeIfNeeded(sheet, selection.value)
+ }
+ 
+ function isCellSelected(cell) {
+@@ -717,17 +3646,348 @@ function isCellSelected(cell) {
+   return rangesIntersect(activeSelection.value, getCellRange(cell))
+ }
+ 
++function isFillHandleCell(cell) {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range || !cell || fillDragState.value) {
++    return false
++  }
++  const tailCell = findCellByCoordinate(sheet, range.endRow, range.endCol)
++  if (!tailCell) {
++    return false
++  }
++  return tailCell.rowIndex === cell.rowIndex && tailCell.colIndex === cell.colIndex
++}
++
++function isCellInFillPreview(cell) {
++  const sheet = currentSheet.value
++  const state = fillDragState.value
++  if (!sheet || !state || state.sheetName !== sheet.name || !cell) {
++    return false
++  }
++  const preview = state.previewRange
++  if (!preview) {
++    return false
++  }
++  const cellRange = getCellRange(cell)
++  if (!rangesIntersect(preview, cellRange)) {
++    return false
++  }
++  return !rangesIntersect(state.sourceRange, cellRange)
++}
++
++function startFillHandleDrag(event) {
++  const sheet = currentSheet.value
++  const range = activeSelection.value
++  if (!sheet || !range) {
++    return
++  }
++  event.preventDefault()
++  event.stopPropagation()
++  fillDragState.value = {
++    sheetName: sheet.name,
++    sourceRange: { ...range },
++    previewRange: { ...range }
++  }
++  document.body.style.cursor = 'crosshair'
++  window.addEventListener('mousemove', handleFillHandlePointerMove)
++  window.addEventListener('mouseup', stopFillHandleDrag)
++}
++
++function stopFillHandleDrag(applyFill = true) {
++  const state = fillDragState.value
++  fillDragState.value = null
++  document.body.style.cursor = ''
++  window.removeEventListener('mousemove', handleFillHandlePointerMove)
++  window.removeEventListener('mouseup', stopFillHandleDrag)
++  if (!applyFill || !state) {
++    return
++  }
++  const sheet = currentSheet.value
++  if (!sheet || state.sheetName !== sheet.name) {
++    return
++  }
++  if (rangesEqual(state.sourceRange, state.previewRange)) {
++    return
++  }
++  applyFillHandleRange(sheet, state.sourceRange, state.previewRange)
++}
++
++function handleFillHandlePointerMove(event) {
++  const state = fillDragState.value
++  const sheet = currentSheet.value
++  if (!state || !sheet || state.sheetName !== sheet.name) {
++    stopFillHandleDrag(false)
++    return
++  }
++  const pointer = resolvePointerCellCoordinate(event.clientX, event.clientY)
++  if (!pointer) {
++    return
++  }
++  const nextRange = buildFillPreviewRange(sheet, state.sourceRange, pointer.rowIndex, pointer.colIndex)
++  if (!nextRange || rangesEqual(nextRange, state.previewRange)) {
++    return
++  }
++  state.previewRange = nextRange
++  fillDragState.value = { ...state }
++}
++
++function resolvePointerCellCoordinate(clientX, clientY) {
++  const element = document.elementFromPoint(Number(clientX || 0), Number(clientY || 0))
++  if (!(element instanceof HTMLElement)) {
++    return null
++  }
++  const cellElement = element.closest('td.sheet-cell[data-row-index][data-col-index]')
++  if (!(cellElement instanceof HTMLElement)) {
++    return null
++  }
++  const rowIndex = Number(cellElement.dataset.rowIndex)
++  const colIndex = Number(cellElement.dataset.colIndex)
++  if (!Number.isFinite(rowIndex) || !Number.isFinite(colIndex)) {
++    return null
++  }
++  return { rowIndex, colIndex }
++}
++
++function buildFillPreviewRange(sheet, sourceRange, rowIndex, colIndex) {
++  if (!sheet || !sourceRange) {
++    return null
++  }
++  const clampedRow = clampNumber(rowIndex, 0, Math.max(sheet.rowCount - 1, 0))
++  const clampedCol = clampNumber(colIndex, 0, Math.max(sheet.maxColumnCount - 1, 0))
++  const deltaRow = clampedRow - sourceRange.endRow
++  const deltaCol = clampedCol - sourceRange.endCol
++  const vertical = Math.abs(deltaRow) >= Math.abs(deltaCol)
++  if (vertical) {
++    const startRow = Math.min(sourceRange.startRow, clampedRow)
++    const endRow = Math.max(sourceRange.endRow, clampedRow)
++    return {
++      startRow,
++      endRow,
++      startCol: sourceRange.startCol,
++      endCol: sourceRange.endCol
++    }
++  }
++  const startCol = Math.min(sourceRange.startCol, clampedCol)
++  const endCol = Math.max(sourceRange.endCol, clampedCol)
++  return {
++    startRow: sourceRange.startRow,
++    endRow: sourceRange.endRow,
++    startCol,
++    endCol
++  }
++}
++
++function applyFillHandleRange(sheet, sourceRange, previewRange) {
++  if (!sheet || !sourceRange || !previewRange) {
++    return
++  }
++  const sourceSnapshots = buildSelectionSnapshotMatrix(sheet, sourceRange)
++  if (!sourceSnapshots.length) {
++    return
++  }
++  const orientation = (previewRange.endRow - previewRange.startRow) > (sourceRange.endRow - sourceRange.startRow)
++    ? 'vertical'
++    : 'horizontal'
++  let changedCount = 0
++  let pushed = false
++  for (let rowIndex = previewRange.startRow; rowIndex <= previewRange.endRow; rowIndex += 1) {
++    for (let colIndex = previewRange.startCol; colIndex <= previewRange.endCol; colIndex += 1) {
++      if (rowIndex >= sourceRange.startRow && rowIndex <= sourceRange.endRow
++        && colIndex >= sourceRange.startCol && colIndex <= sourceRange.endCol) {
++        continue
++      }
++      const sourcePoint = mapFillSourceCoordinate(sourceRange, rowIndex, colIndex)
++      const sourceSnapshot = sourceSnapshots[sourcePoint.rowOffset]?.[sourcePoint.colOffset]
++      if (!sourceSnapshot) {
++        continue
++      }
++      let targetCell = findCellByCoordinate(sheet, rowIndex, colIndex)
++      if (!targetCell) {
++        targetCell = createSyntheticCell(sheet, rowIndex, colIndex, null, false)
++        sheet.cells.push(targetCell)
++      }
++      const nextValue = resolveFillTargetValue(sheet, sourceRange, sourceSnapshots, sourcePoint, rowIndex, colIndex, orientation)
++      const applyResult = applyCellInputValue(sheet, targetCell, nextValue, { skipValidation: true })
++      if (!applyResult.applied) {
++        continue
++      }
++      if (!pushed) {
++        pushUndoSnapshot()
++        pushed = true
++      }
++      if (sourceSnapshot.style && typeof sourceSnapshot.style === 'object') {
++        applyCellStyleChange(sheet, targetCell, sourceSnapshot.style)
++      }
++      changedCount += 1
++    }
++  }
++  if (!changedCount) {
++    return
++  }
++  recomputeSheetFormulaDisplays(sheet)
++  rebuildSheetRows(sheet)
++  recountSheetCellDirtyCount(sheet)
++  scheduleDirtyStateRefresh()
++  selection.value = {
++    sheetName: sheet.name,
++    anchorStartRow: sourceRange.anchorStartRow ?? sourceRange.startRow,
++    anchorEndRow: sourceRange.anchorEndRow ?? sourceRange.endRow,
++    anchorStartCol: sourceRange.anchorStartCol ?? sourceRange.startCol,
++    anchorEndCol: sourceRange.anchorEndCol ?? sourceRange.endCol,
++    startRow: previewRange.startRow,
++    endRow: previewRange.endRow,
++    startCol: previewRange.startCol,
++    endCol: previewRange.endCol
++  }
++}
++
++function mapFillSourceCoordinate(sourceRange, rowIndex, colIndex) {
++  const rowSpan = sourceRange.endRow - sourceRange.startRow + 1
++  const colSpan = sourceRange.endCol - sourceRange.startCol + 1
++  const rowOffset = ((rowIndex - sourceRange.startRow) % rowSpan + rowSpan) % rowSpan
++  const colOffset = ((colIndex - sourceRange.startCol) % colSpan + colSpan) % colSpan
++  return { rowOffset, colOffset }
++}
++
++function resolveFillTargetValue(sheet, sourceRange, sourceSnapshots, sourcePoint, targetRowIndex, targetColIndex, orientation) {
++  const snapshot = sourceSnapshots[sourcePoint.rowOffset]?.[sourcePoint.colOffset]
++  if (!snapshot) {
++    return ''
++  }
++  const rawValue = normalizeValue(snapshot.value)
++  if (snapshot.formula && rawValue.startsWith('=')) {
++    const sourceRowIndex = sourceRange.startRow + sourcePoint.rowOffset
++    const sourceColIndex = sourceRange.startCol + sourcePoint.colOffset
++    return shiftFormulaReference(rawValue, targetRowIndex - sourceRowIndex, targetColIndex - sourceColIndex)
++  }
++  const seriesValue = resolveFillSeriesValue(sourceRange, sourceSnapshots, sourcePoint, targetRowIndex, targetColIndex, orientation)
++  if (seriesValue != null) {
++    return seriesValue
++  }
++  return rawValue
++}
++
++function resolveFillSeriesValue(sourceRange, sourceSnapshots, sourcePoint, targetRowIndex, targetColIndex, orientation) {
++  if (orientation === 'vertical') {
++    const points = []
++    for (let rowOffset = 0; rowOffset < sourceSnapshots.length; rowOffset += 1) {
++      points.push(normalizeValue(sourceSnapshots[rowOffset]?.[sourcePoint.colOffset]?.value))
++    }
++    const series = analyzeSeriesPoints(points)
++    if (!series) {
++      return null
++    }
++    const index = targetRowIndex - sourceRange.startRow
++    return formatSeriesValue(series, index)
++  }
++  const points = []
++  for (let colOffset = 0; colOffset < (sourceSnapshots[0] || []).length; colOffset += 1) {
++    points.push(normalizeValue(sourceSnapshots[sourcePoint.rowOffset]?.[colOffset]?.value))
++  }
++  const series = analyzeSeriesPoints(points)
++  if (!series) {
++    return null
++  }
++  const index = targetColIndex - sourceRange.startCol
++  return formatSeriesValue(series, index)
++}
++
++function analyzeSeriesPoints(points) {
++  const source = Array.isArray(points) ? points : []
++  if (source.length < 2) {
++    return null
++  }
++  const numericPoints = source.map((item) => parseNumericCellValue(item))
++  if (numericPoints.every(Boolean)) {
++    const percent = numericPoints.every((item) => item.isPercent)
++    const decimals = Math.max(...numericPoints.map((item) => item.decimals))
++    const step = numericPoints[numericPoints.length - 1].value - numericPoints[numericPoints.length - 2].value
++    return {
++      kind: 'number',
++      start: numericPoints[0].value,
++      step,
++      decimals,
++      percent
++    }
++  }
++  const datePoints = source.map((item) => parseDateCellValue(item))
++  if (datePoints.every(Boolean)) {
++    const last = datePoints[datePoints.length - 1]
++    const prev = datePoints[datePoints.length - 2]
++    const stepDays = Math.round((last.getTime() - prev.getTime()) / 86400000)
++    return {
++      kind: 'date',
++      start: datePoints[0],
++      stepDays
++    }
++  }
++  return null
++}
++
++function formatSeriesValue(series, index) {
++  const safeIndex = Number(index)
++  if (!Number.isFinite(safeIndex)) {
++    return null
++  }
++  if (series.kind === 'number') {
++    const value = series.start + series.step * safeIndex
++    if (series.percent) {
++      return `${(value * 100).toFixed(series.decimals)}%`
++    }
++    return Number(value).toFixed(series.decimals)
++  }
++  if (series.kind === 'date') {
++    const timestamp = series.start.getTime() + series.stepDays * safeIndex * 86400000
++    return formatDateValue(new Date(timestamp))
++  }
++  return null
++}
++
++function shiftFormulaReference(formula, rowDelta, colDelta) {
++  const source = normalizeValue(formula)
++  if (!source.startsWith('=')) {
++    return source
++  }
++  return source.replace(/(\$?)([A-Z]{1,4})(\$?)(\d{1,7})/g, (_, fixedCol, colText, fixedRow, rowText) => {
++    let nextCol = columnLabelToIndex(colText)
++    let nextRow = Number(rowText) - 1
++    if (!fixedCol) {
++      nextCol += colDelta
++    }
++    if (!fixedRow) {
++      nextRow += rowDelta
++    }
++    nextCol = Math.max(nextCol, 0)
++    nextRow = Math.max(nextRow, 0)
++    const colLabel = toColumnLabel(nextCol)
++    const rowLabel = String(nextRow + 1)
++    return `${fixedCol ? '$' : ''}${colLabel}${fixedRow ? '$' : ''}${rowLabel}`
++  })
++}
++
++function rangesEqual(left, right) {
++  if (!left || !right) {
++    return false
++  }
++  return left.startRow === right.startRow
++    && left.endRow === right.endRow
++    && left.startCol === right.startCol
++    && left.endCol === right.endCol
++}
++
+ async function mergeSelectedCells() {
+   const sheet = currentSheet.value
+   const range = activeSelection.value
+   if (!sheet || !range) {
+-    ElMessage.warning('请先选择需要合并的单元格')
++    ElMessage.warning('')
+     return
+   }
+   if (getSelectionArea(range) < 2) {
+-    ElMessage.info('至少选择 2 个单元格后才能合并')
++    ElMessage.info(' 2 ?')
+     return
+   }
++  pushUndoSnapshot()
+ 
+   const cellsToClear = sheet.cells.filter((cell) => {
+     if (!isCellTopLeftInsideRange(cell, range)) {
+@@ -740,9 +4000,9 @@ async function mergeSelectedCells() {
+   })
+   if (cellsToClear.length) {
+     try {
+-      await ElMessageBox.confirm('合并后仅保留左上角内容，范围内其它内容会被清空，是否继续？', '确认合并', {
++      await ElMessageBox.confirm('填充将覆盖目标区域已有内容，是否继续？', '提示', {
+         type: 'warning',
+-        confirmButtonText: '确认合并',
++        confirmButtonText: '继续',
+         cancelButtonText: '取消'
+       })
+     } catch {
+@@ -753,7 +4013,7 @@ async function mergeSelectedCells() {
+   expandMergedCellsToSingles(sheet, range)
+   const topLeftCell = findCellAt(sheet, range.startRow, range.startCol)
+   if (!topLeftCell) {
+-    ElMessage.warning('选区无效，无法合并')
++    ElMessage.warning('?')
+     return
+   }
+ 
+@@ -789,14 +4049,14 @@ async function mergeSelectedCells() {
+     endCol: range.endCol
+   }
+   scheduleDirtyStateRefresh()
+-  ElMessage.success('合并区域已更新，保存后将写回文件')
++  ElMessage.success('閸氬牆鑻熼崠鍝勭厵瀹稿弶娲块弬甯礉娣囨繂鐡ㄩ崥搴＄殺閸愭瑥娲栭弬鍥︽')
+ }
+ 
+ function unmergeSelectedCells() {
+   const sheet = currentSheet.value
+   const range = activeSelection.value
+   if (!sheet || !range) {
+-    ElMessage.warning('请先选择已合并的单元格')
++    ElMessage.warning('?')
+     return
+   }
+ 
+@@ -807,9 +4067,10 @@ function unmergeSelectedCells() {
+   )
+ 
+   if (!targetKeys.size) {
+-    ElMessage.info('当前选区内没有已合并单元格')
++    ElMessage.info('?')
+     return
+   }
++  pushUndoSnapshot()
+ 
+   const nextCells = []
+   for (const cell of sheet.cells) {
+@@ -826,7 +4087,7 @@ function unmergeSelectedCells() {
+   recountSheetCellDirtyCount(sheet)
+   recountSheetMergeDirtyCount(sheet)
+   scheduleDirtyStateRefresh()
+-  ElMessage.success('已取消合并，保存后将写回文件')
++  ElMessage.success('填充完成')
+ }
+ 
+ function expandMergedCellsToSingles(sheet, range) {
+@@ -853,50 +4114,312 @@ function expandMergedCellsToSingles(sheet, range) {
+   sheet.cells = dedupeCells(nextCells)
+ }
+ 
+-function splitMergedCell(sheet, cell, forceDirty = false) {
+-  if (!isMergedCell(cell)) {
+-    return [cell]
++function splitMergedCell(sheet, cell, forceDirty = false) {
++  if (!isMergedCell(cell)) {
++    return [cell]
++  }
++
++  const items = []
++  for (let rowOffset = 0; rowOffset < cell.rowSpan; rowOffset += 1) {
++    for (let colOffset = 0; colOffset < cell.colSpan; colOffset += 1) {
++      const rowIndex = cell.rowIndex + rowOffset
++      const colIndex = cell.colIndex + colOffset
++      if (rowOffset === 0 && colOffset === 0) {
++        cell.rowSpan = 1
++        cell.colSpan = 1
++        syncCellDimensions(sheet, cell)
++        items.push(cell)
++        continue
++      }
++      items.push(createSyntheticCell(sheet, rowIndex, colIndex, cell.style, forceDirty))
++    }
++  }
++  return items
++}
++
++function createSyntheticCell(sheet, rowIndex, colIndex, style, forceDirty) {
++  const value = ''
++  const normalizedStyle = cloneCellStyle(style)
++  return {
++    rowIndex,
++    colIndex,
++    rowSpan: 1,
++    colSpan: 1,
++    widthPx: resolveRangeWidth(sheet, colIndex, 1),
++    heightPx: resolveRangeHeight(sheet, rowIndex, 1),
++    value,
++    originalValue: value,
++    displayValue: value,
++    formula: false,
++    dirty: Boolean(forceDirty),
++    forceDirty: Boolean(forceDirty),
++    style: normalizedStyle,
++    originalStyle: cloneCellStyle(normalizedStyle)
++  }
++}
++
++function findCellAt(sheet, rowIndex, colIndex) {
++  return sheet.cells.find((cell) => cell.rowIndex === rowIndex && cell.colIndex === colIndex) || null
++}
++
++function findCellByCoordinate(sheet, rowIndex, colIndex) {
++  if (!sheet) {
++    return null
++  }
++  for (const cell of sheet.cells) {
++    if (rowIndex < cell.rowIndex || rowIndex >= cell.rowIndex + cell.rowSpan) {
++      continue
++    }
++    if (colIndex < cell.colIndex || colIndex >= cell.colIndex + cell.colSpan) {
++      continue
++    }
++    return cell
++  }
++  return null
++}
++
++function isFormulaValue(value) {
++  const text = normalizeValue(value)
++  return text.startsWith('=') && text.length > 1
++}
++
++function validateCellValueAgainstOptions(cell, inputValue, options = {}) {
++  const skipValidation = Boolean(options?.skipValidation)
++  const value = normalizeValue(inputValue)
++  if (skipValidation || !hasValidationOptions(cell)) {
++    return { valid: true, value }
++  }
++  if (isFormulaValue(value)) {
++    return { valid: true, value }
++  }
++  const allowBlank = cell.validationAllowBlank !== false
++  if (!value) {
++    return allowBlank ? { valid: true, value } : { valid: false, value }
++  }
++  const candidates = Array.isArray(cell.validationOptions) ? cell.validationOptions.map((item) => normalizeValue(item)) : []
++  if (candidates.includes(value)) {
++    return { valid: true, value }
++  }
++  return { valid: false, value }
++}
++
++function applyCellInputValue(sheet, cell, inputValue, options = {}) {
++  if (!sheet || !cell) {
++    return { applied: false, reason: 'missing-cell' }
++  }
++  let nextValue = normalizeValue(inputValue)
++  if (nextValue.length > MAX_CELL_TEXT_LENGTH) {
++    nextValue = nextValue.slice(0, MAX_CELL_TEXT_LENGTH)
++  }
++  const validation = validateCellValueAgainstOptions(cell, nextValue, options)
++  if (!validation.valid) {
++    return { applied: false, reason: 'validation' }
++  }
++  nextValue = validation.value
++  const formulaMode = isFormulaValue(nextValue)
++  cell.formula = formulaMode
++  applyCellDirtyChange(sheet, cell, nextValue)
++  if (formulaMode) {
++    cell.displayValue = normalizeValue(evaluateFormulaCell(sheet, cell, new Set()))
++  } else {
++    cell.displayValue = nextValue
++  }
++  return { applied: true, value: nextValue }
++}
++
++function recomputeSheetFormulaDisplays(sheet) {
++  if (!sheet) {
++    return
++  }
++  for (const cell of sheet.cells) {
++    if (isFormulaValue(cell.value)) {
++      cell.formula = true
++      cell.displayValue = normalizeValue(evaluateFormulaCell(sheet, cell, new Set()))
++      continue
++    }
++    cell.formula = false
++    cell.displayValue = normalizeValue(cell.value)
++  }
++}
++
++function evaluateFormulaCell(sheet, cell, trail = new Set()) {
++  if (!sheet || !cell) {
++    return ''
++  }
++  const formulaText = normalizeValue(cell.value)
++  if (!isFormulaValue(formulaText)) {
++    return formulaText
++  }
++  const key = `${sheet.name}:${cell.rowIndex}:${cell.colIndex}`
++  if (trail.has(key)) {
++    return '#CYCLE!'
++  }
++  trail.add(key)
++  try {
++    const expression = formulaText.slice(1).trim()
++    if (!expression) {
++      return ''
++    }
++    return evaluateFormulaExpression(sheet, cell, expression, trail)
++  } catch {
++    return '#ERROR!'
++  } finally {
++    trail.delete(key)
++  }
++}
++
++function evaluateFormulaExpression(sheet, cell, expression, trail) {
++  let expr = normalizeValue(expression).toUpperCase()
++  expr = expr.replace(/\bROW\(\)/g, String(Math.max(Number(cell?.rowIndex || 0) + 1, 1)))
++  expr = expr.replace(/\bCOLUMN\(\)/g, String(Math.max(Number(cell?.colIndex || 0) + 1, 1)))
++  expr = replaceFormulaFunction(expr, 'SUM', (argsText) => {
++    const values = resolveFormulaArgsValues(argsText, sheet, trail)
++    return values.reduce((acc, value) => acc + value, 0)
++  })
++  expr = replaceFormulaFunction(expr, 'AVERAGE', (argsText) => {
++    const values = resolveFormulaArgsValues(argsText, sheet, trail)
++    return values.length ? values.reduce((acc, value) => acc + value, 0) / values.length : 0
++  })
++  expr = replaceFormulaFunction(expr, 'MIN', (argsText) => {
++    const values = resolveFormulaArgsValues(argsText, sheet, trail)
++    return values.length ? Math.min(...values) : 0
++  })
++  expr = replaceFormulaFunction(expr, 'MAX', (argsText) => {
++    const values = resolveFormulaArgsValues(argsText, sheet, trail)
++    return values.length ? Math.max(...values) : 0
++  })
++  expr = replaceFormulaFunction(expr, 'COUNT', (argsText) => {
++    const values = resolveFormulaArgsValues(argsText, sheet, trail)
++    return values.filter((value) => Number.isFinite(value)).length
++  })
++  expr = expr.replace(/\$?([A-Z]{1,4})\$?(\d{1,7})/g, (_, colText, rowText) => {
++    const colIndex = columnLabelToIndex(colText)
++    const rowIndex = Number(rowText) - 1
++    return String(resolveFormulaNumericValue(sheet, rowIndex, colIndex, trail))
++  })
++  const safe = expr.replace(/\s+/g, '')
++  if (!safe) {
++    return ''
++  }
++  if (!/^[-+*/().\d]+$/.test(safe)) {
++    return '#N/A'
++  }
++  const result = evaluateSimpleMathExpression(safe)
++  if (result == null || Number.isNaN(result) || !Number.isFinite(result)) {
++    return '#ERROR!'
++  }
++  return String(result)
++}
++
++function replaceFormulaFunction(expression, name, resolver) {
++  let next = expression
++  const pattern = new RegExp(`${name}\\(([^()]*)\\)`, 'gi')
++  let guard = 0
++  while (guard < 200 && pattern.test(next)) {
++    next = next.replace(pattern, (_, argsText) => {
++      const result = resolver(argsText)
++      return Number.isFinite(result) ? String(result) : '0'
++    })
++    guard += 1
++  }
++  return next
++}
++
++function resolveFormulaArgsValues(argsText, sheet, trail) {
++  const args = normalizeValue(argsText)
++    .split(',')
++    .map((arg) => normalizeValue(arg).trim())
++    .filter((arg) => arg.length > 0)
++  const values = []
++  for (const arg of args) {
++    const rangeMatched = arg.match(/^\$?([A-Z]{1,4})\$?(\d{1,7})\s*:\s*\$?([A-Z]{1,4})\$?(\d{1,7})$/)
++    if (rangeMatched) {
++      const startCol = columnLabelToIndex(rangeMatched[1])
++      const startRow = Number(rangeMatched[2]) - 1
++      const endCol = columnLabelToIndex(rangeMatched[3])
++      const endRow = Number(rangeMatched[4]) - 1
++      const minRow = Math.min(startRow, endRow)
++      const maxRow = Math.max(startRow, endRow)
++      const minCol = Math.min(startCol, endCol)
++      const maxCol = Math.max(startCol, endCol)
++      for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex += 1) {
++        for (let colIndex = minCol; colIndex <= maxCol; colIndex += 1) {
++          values.push(resolveFormulaNumericValue(sheet, rowIndex, colIndex, trail))
++        }
++      }
++      continue
++    }
++    const referenceMatched = arg.match(/^\$?([A-Z]{1,4})\$?(\d{1,7})$/)
++    if (referenceMatched) {
++      const colIndex = columnLabelToIndex(referenceMatched[1])
++      const rowIndex = Number(referenceMatched[2]) - 1
++      values.push(resolveFormulaNumericValue(sheet, rowIndex, colIndex, trail))
++      continue
++    }
++    const numeric = Number(arg)
++    values.push(Number.isFinite(numeric) ? numeric : 0)
++  }
++  return values
++}
++
++function resolveFormulaNumericValue(sheet, rowIndex, colIndex, trail) {
++  if (!sheet || rowIndex < 0 || colIndex < 0) {
++    return 0
++  }
++  const cell = findCellByCoordinate(sheet, rowIndex, colIndex)
++  if (!cell) {
++    return 0
++  }
++  if (isFormulaValue(cell.value)) {
++    const result = evaluateFormulaCell(sheet, cell, trail)
++    const numeric = Number(result)
++    return Number.isFinite(numeric) ? numeric : 0
++  }
++  const numeric = Number(normalizeValue(cell.value).replace(/,/g, ''))
++  return Number.isFinite(numeric) ? numeric : 0
++}
++
++function evaluateSimpleMathExpression(expression) {
++  try {
++    return Function(`"use strict"; return (${expression});`)()
++  } catch {
++    return null
+   }
++}
+ 
+-  const items = []
+-  for (let rowOffset = 0; rowOffset < cell.rowSpan; rowOffset += 1) {
+-    for (let colOffset = 0; colOffset < cell.colSpan; colOffset += 1) {
+-      const rowIndex = cell.rowIndex + rowOffset
+-      const colIndex = cell.colIndex + colOffset
+-      if (rowOffset === 0 && colOffset === 0) {
+-        cell.rowSpan = 1
+-        cell.colSpan = 1
+-        syncCellDimensions(sheet, cell)
+-        items.push(cell)
+-        continue
+-      }
+-      items.push(createSyntheticCell(sheet, rowIndex, colIndex, cell.style, forceDirty))
++function columnLabelToIndex(label) {
++  const text = normalizeValue(label).toUpperCase()
++  let result = 0
++  for (let index = 0; index < text.length; index += 1) {
++    const charCode = text.charCodeAt(index)
++    if (charCode < 65 || charCode > 90) {
++      return 0
+     }
++    result = result * 26 + (charCode - 64)
+   }
+-  return items
++  return Math.max(result - 1, 0)
+ }
+ 
+-function createSyntheticCell(sheet, rowIndex, colIndex, style, forceDirty) {
+-  const value = ''
+-  return {
+-    rowIndex,
+-    colIndex,
+-    rowSpan: 1,
+-    colSpan: 1,
+-    widthPx: resolveRangeWidth(sheet, colIndex, 1),
+-    heightPx: resolveRangeHeight(sheet, rowIndex, 1),
+-    value,
+-    originalValue: value,
+-    displayValue: value,
+-    formula: false,
+-    dirty: Boolean(forceDirty),
+-    forceDirty: Boolean(forceDirty),
+-    style: style ? { ...style } : {}
++function applyCellDirtyChange(sheet, cell, nextValue) {
++  if (!sheet || !cell) {
++    return
++  }
++  const safeValue = normalizeValue(nextValue)
++  const limitedValue = safeValue.length > MAX_CELL_TEXT_LENGTH
++    ? safeValue.slice(0, MAX_CELL_TEXT_LENGTH)
++    : safeValue
++  const previousDirty = Boolean(cell.dirty)
++  cell.value = limitedValue
++  cell.dirty = cell.forceDirty
++    || normalizeValue(cell.value) !== normalizeValue(cell.originalValue)
++    || hasStyleChanged(cell)
++  ensureSheetDirtyMetrics(sheet)
++  if (previousDirty !== cell.dirty) {
++    sheet.cellDirtyCount += cell.dirty ? 1 : -1
++    if (sheet.cellDirtyCount < 0) {
++      sheet.cellDirtyCount = 0
++    }
+   }
+-}
+-
+-function findCellAt(sheet, rowIndex, colIndex) {
+-  return sheet.cells.find((cell) => cell.rowIndex === rowIndex && cell.colIndex === colIndex) || null
+ }
+ 
+ function isCellTopLeftInsideRange(cell, range) {
+@@ -933,6 +4456,7 @@ function refreshDirtyState() {
+     totalChanges += sheet.rowDirtyIndexes.size
+     totalChanges += sheet.columnDirtyIndexes.size
+   }
++  totalChanges += pendingStructures.value.length
+   dirtyCount.value = totalChanges
+   isDirty.value = totalChanges > 0
+ }
+@@ -1012,8 +4536,8 @@ function buildDimensionDirtySet(currentValues, originalValues, fallbackValue) {
+   const original = Array.isArray(originalValues) ? originalValues : []
+   const length = Math.max(current.length, original.length)
+   for (let index = 0; index < length; index += 1) {
+-    const currentValue = Math.round(Number(current[index] ?? fallbackValue))
+-    const originalValue = Math.round(Number(original[index] ?? fallbackValue))
++    const currentValue = Math.round(Number(current[index] || fallbackValue))
++    const originalValue = Math.round(Number(original[index] || fallbackValue))
+     if (currentValue !== originalValue) {
+       dirtySet.add(index)
+     }
+@@ -1023,8 +4547,8 @@ function buildDimensionDirtySet(currentValues, originalValues, fallbackValue) {
+ 
+ function updateRowDirtyMarker(sheet, rowIndex) {
+   ensureSheetDirtyMetrics(sheet)
+-  const currentValue = Math.round(Number(sheet.rowHeights[rowIndex] ?? DEFAULT_ROW_HEIGHT))
+-  const originalValue = Math.round(Number(sheet.originalRowHeights?.[rowIndex] ?? DEFAULT_ROW_HEIGHT))
++  const currentValue = Math.round(Number(sheet.rowHeights[rowIndex] || DEFAULT_ROW_HEIGHT))
++  const originalValue = Math.round(Number(sheet.originalRowHeights?.[rowIndex] || DEFAULT_ROW_HEIGHT))
+   if (currentValue !== originalValue) {
+     sheet.rowDirtyIndexes.add(rowIndex)
+   } else {
+@@ -1034,8 +4558,8 @@ function updateRowDirtyMarker(sheet, rowIndex) {
+ 
+ function updateColumnDirtyMarker(sheet, colIndex) {
+   ensureSheetDirtyMetrics(sheet)
+-  const currentValue = Math.round(Number(sheet.columnWidths[colIndex] ?? DEFAULT_COLUMN_WIDTH))
+-  const originalValue = Math.round(Number(sheet.originalColumnWidths?.[colIndex] ?? DEFAULT_COLUMN_WIDTH))
++  const currentValue = Math.round(Number(sheet.columnWidths[colIndex] || DEFAULT_COLUMN_WIDTH))
++  const originalValue = Math.round(Number(sheet.originalColumnWidths?.[colIndex] || DEFAULT_COLUMN_WIDTH))
+   if (currentValue !== originalValue) {
+     sheet.columnDirtyIndexes.add(colIndex)
+   } else {
+@@ -1043,6 +4567,12 @@ function updateColumnDirtyMarker(sheet, colIndex) {
+   }
+ }
+ 
++function rebuildSheetDimensionDirtyIndexes(sheet) {
++  ensureSheetDirtyMetrics(sheet)
++  sheet.rowDirtyIndexes = buildDimensionDirtySet(sheet.rowHeights, sheet.originalRowHeights, DEFAULT_ROW_HEIGHT)
++  sheet.columnDirtyIndexes = buildDimensionDirtySet(sheet.columnWidths, sheet.originalColumnWidths, DEFAULT_COLUMN_WIDTH)
++}
++
+ function countMergeChanges() {
+   let total = 0
+   for (const sheet of sheets.value) {
+@@ -1066,12 +4596,16 @@ function collectChanges() {
+       if (!cell.dirty) {
+         continue
+       }
+-      changes.push({
++      const patch = {
+         sheetName: sheet.name,
+         rowIndex: cell.rowIndex,
+         colIndex: cell.colIndex,
+         value: normalizeValue(cell.value)
+-      })
++      }
++      if (hasStyleChanged(cell)) {
++        patch.style = buildStylePatchPayload(cell.style)
++      }
++      changes.push(patch)
+     }
+   }
+   return changes
+@@ -1101,8 +4635,8 @@ function collectRowHeightChanges() {
+   for (const sheet of sheets.value) {
+     const rowLength = Math.max(sheet.rowHeights.length, (sheet.originalRowHeights || []).length)
+     for (let index = 0; index < rowLength; index += 1) {
+-      const current = Math.round(Number(sheet.rowHeights[index] ?? DEFAULT_ROW_HEIGHT))
+-      const original = Math.round(Number(sheet.originalRowHeights?.[index] ?? DEFAULT_ROW_HEIGHT))
++      const current = Math.round(Number(sheet.rowHeights[index] || DEFAULT_ROW_HEIGHT))
++      const original = Math.round(Number(sheet.originalRowHeights?.[index] || DEFAULT_ROW_HEIGHT))
+       if (current !== original) {
+         changes.push({
+           sheetName: sheet.name,
+@@ -1120,8 +4654,8 @@ function collectColumnWidthChanges() {
+   for (const sheet of sheets.value) {
+     const columnLength = Math.max(sheet.columnWidths.length, (sheet.originalColumnWidths || []).length)
+     for (let index = 0; index < columnLength; index += 1) {
+-      const current = Math.round(Number(sheet.columnWidths[index] ?? DEFAULT_COLUMN_WIDTH))
+-      const original = Math.round(Number(sheet.originalColumnWidths?.[index] ?? DEFAULT_COLUMN_WIDTH))
++      const current = Math.round(Number(sheet.columnWidths[index] || DEFAULT_COLUMN_WIDTH))
++      const original = Math.round(Number(sheet.originalColumnWidths?.[index] || DEFAULT_COLUMN_WIDTH))
+       if (current !== original) {
+         changes.push({
+           sheetName: sheet.name,
+@@ -1134,14 +4668,42 @@ function collectColumnWidthChanges() {
+   return changes
+ }
+ 
+-async function saveToServer() {
++function markWorkbookSaved(serverData = {}) {
++  currentWorkbookVersion.value = serverData?.version ? String(serverData.version) : currentWorkbookVersion.value
++  currentFileName.value = serverData?.currentFileName || currentFileName.value
++  workbookName.value = serverData?.fileName || currentFileName.value || workbookName.value
++  pendingStructures.value = []
++
++  for (const sheet of sheets.value) {
++    for (const cell of sheet.cells) {
++      cell.originalValue = normalizeValue(cell.value)
++      cell.originalStyle = cloneCellStyle(cell.style)
++      cell.dirty = false
++      cell.forceDirty = false
++    }
++    sheet.originalMergeKeys = collectSheetMergeKeys(sheet)
++    sheet.originalRowHeights = sheet.rowHeights.map((height) => Math.round(Number(height || DEFAULT_ROW_HEIGHT)))
++    sheet.originalColumnWidths = sheet.columnWidths.map((width) => Math.round(Number(width || DEFAULT_COLUMN_WIDTH)))
++    initializeSheetDirtyMetrics(sheet)
++  }
++
++  refreshDirtyState()
++}
++
++async function saveToServer(options = {}) {
++  const silent = Boolean(options?.silent)
++  const commitLocal = Boolean(options?.commitLocal)
+   if (!currentFileName.value || !hasWorkbook.value) {
+-    ElMessage.warning('请先加载 Excel 文件')
++    if (!silent) {
++      ElMessage.warning('请先打开 Excel 文件后再保存')
++    }
+     return
+   }
+   if (!currentWorkbookVersion.value) {
+-    ElMessage.warning('当前文件版本信息缺失，请先重新加载后再保存')
+-    await loadWorkbookByFileName(currentFileName.value, true)
++    if (!silent) {
++      ElMessage.warning('?')
++    }
++    await loadWorkbookByFileName(currentFileName.value, true, { notify: !silent })
+     return
+   }
+ 
+@@ -1156,8 +4718,11 @@ async function saveToServer() {
+   const mergeChanges = countMergeChanges()
+   const rowHeightChanges = collectRowHeightChanges()
+   const columnWidthChanges = collectColumnWidthChanges()
+-  if (!changes.length && !mergeChanges && !rowHeightChanges.length && !columnWidthChanges.length) {
+-    ElMessage.info('当前没有需要保存的修改')
++  const structures = pendingStructures.value.slice()
++  if (!changes.length && !mergeChanges && !rowHeightChanges.length && !columnWidthChanges.length && !structures.length) {
++    if (!silent) {
++      ElMessage.info('瑜版挸澧犲▽鈩冩箒闂団偓鐟曚椒绻氱�涙娈戞穱顔芥暭')
++    }
+     return
+   }
+ 
+@@ -1169,23 +4734,36 @@ async function saveToServer() {
+       changes,
+       mergeRegions: mergeChanges ? collectMergeRegions() : undefined,
+       rowHeights: rowHeightChanges.length ? rowHeightChanges : undefined,
+-      columnWidths: columnWidthChanges.length ? columnWidthChanges : undefined
++      columnWidths: columnWidthChanges.length ? columnWidthChanges : undefined,
++      structures: structures.length ? structures : undefined
+     })
+     if (response?.code !== 200) {
+       if (response?.data?.versionConflict) {
+         const nextFileName = response?.data?.currentFileName || currentFileName.value
+-        ElMessage.warning(response?.msg || '文件已在服务器更新，请重新加载后再保存')
+-        await loadWorkbookByFileName(nextFileName, true)
++        if (!silent) {
++          ElMessage.warning(response?.msg || '?')
++        }
++        await loadWorkbookByFileName(nextFileName, true, { notify: !silent })
+         return
+       }
+-      ElMessage.error(response?.msg || '保存工作簿失败')
++      if (!silent) {
++        ElMessage.error(response?.msg || '?')
++      }
+       return
+     }
+-    const nextFileName = response?.data?.currentFileName || currentFileName.value
+-    await loadWorkbookByFileName(nextFileName, true)
+-    ElMessage.success(response?.msg || 'Excel 保存成功')
++    if (commitLocal) {
++      markWorkbookSaved(response?.data || {})
++    } else {
++      const nextFileName = response?.data?.currentFileName || currentFileName.value
++      await loadWorkbookByFileName(nextFileName, true, { notify: !silent })
++    }
++    if (!silent) {
++      ElMessage.success(response?.msg || 'Excel 娣囨繂鐡ㄩ幋鎰')
++    }
+   } catch (error) {
+-    ElMessage.error(error?.message || '保存工作簿失败')
++    if (!silent) {
++      ElMessage.error(error?.message || '?')
++    }
+   } finally {
+     saving.value = false
+   }
+@@ -1193,7 +4771,7 @@ async function saveToServer() {
+ 
+ async function reloadWorkbook() {
+   if (!currentFileName.value) {
+-    ElMessage.warning('当前未选择文件')
++    ElMessage.warning('当前没有可刷新的文件')
+     return
+   }
+   await loadWorkbookByFileName(currentFileName.value)
+@@ -1201,15 +4779,15 @@ async function reloadWorkbook() {
+ 
+ async function downloadServerWorkbook() {
+   if (!currentFileName.value) {
+-    ElMessage.warning('当前没有可下载文件')
++    ElMessage.warning('?')
+     return
+   }
+   try {
+     const buffer = await getExcelEditorContent(currentFileName.value)
+     saveAs(new Blob([buffer]), currentFileName.value)
+-    ElMessage.success('文件下载成功')
++    ElMessage.success('下载成功')
+   } catch (error) {
+-    ElMessage.error(error?.message || '下载失败')
++    ElMessage.error(error?.message || '娑撳娴囨径杈Е')
+   }
+ }
+ 
+@@ -1255,21 +4833,21 @@ function buildImageStyle(image) {
+     return {}
+   }
+ 
+-  const dx = Math.max(Number(image?.dx1Px ?? 0), 0)
+-  const dy = Math.max(Number(image?.dy1Px ?? 0), 0)
++  const dx = Math.max(Number(image?.dx1Px || 0), 0)
++  const dy = Math.max(Number(image?.dy1Px || 0), 0)
+   const top = COLUMN_HEADER_HEIGHT + resolveFrozenTopOffset(sheet, image.row1) + dy
+   const left = ROW_INDEX_WIDTH + resolveFrozenLeftOffset(sheet, image.col1) + dx
+ 
+   const style = {
+     top: `${top}px`,
+     left: `${left}px`,
+-    width: `${Math.max(Number(image?.widthPx ?? 0), 1)}px`,
+-    height: `${Math.max(Number(image?.heightPx ?? 0), 1)}px`
++    width: `${Math.max(Number(image?.widthPx || 0), 1)}px`,
++    height: `${Math.max(Number(image?.heightPx || 0), 1)}px`
+   }
+ 
+   const freezePane = sheet.freezePane || { xSplit: 0, ySplit: 0 }
+-  const freezeRows = Math.max(Number(freezePane.ySplit ?? 0), 0)
+-  const freezeColumns = Math.max(Number(freezePane.xSplit ?? 0), 0)
++  const freezeRows = Math.max(Number(freezePane.ySplit || 0), 0)
++  const freezeColumns = Math.max(Number(freezePane.xSplit || 0), 0)
+   const inFrozenRow = image.kind !== 'background' && image.row1 < freezeRows
+   const inFrozenColumn = image.kind !== 'background' && image.col1 < freezeColumns
+   if (inFrozenRow || inFrozenColumn) {
+@@ -1306,10 +4884,12 @@ function buildCellTdStyle(cell) {
+   }
+ 
+   const freezePane = sheet.freezePane || { xSplit: 0, ySplit: 0 }
+-  const freezeRows = Math.max(Number(freezePane.ySplit ?? 0), 0)
+-  const freezeColumns = Math.max(Number(freezePane.xSplit ?? 0), 0)
++  const freezeRows = Math.max(Number(freezePane.ySplit || 0), 0)
++  const freezeColumns = Math.max(Number(freezePane.xSplit || 0), 0)
+   const inFrozenRow = cell.rowIndex < freezeRows
+   const inFrozenColumn = cell.colIndex < freezeColumns
++  const atFreezeBottomEdge = freezeRows > 0 && cell.rowIndex + cell.rowSpan - 1 === freezeRows - 1
++  const atFreezeRightEdge = freezeColumns > 0 && cell.colIndex + cell.colSpan - 1 === freezeColumns - 1
+ 
+   if (inFrozenRow || inFrozenColumn) {
+     style.position = 'sticky'
+@@ -1322,6 +4902,12 @@ function buildCellTdStyle(cell) {
+     style.zIndex = inFrozenRow && inFrozenColumn ? 5 : 4
+     style.boxShadow = 'inset 0 0 0 1px rgba(15, 122, 90, 0.08)'
+   }
++  if (atFreezeBottomEdge && !cell.style?.borderBottom) {
++    style.borderBottom = '2px solid #2563eb'
++  }
++  if (atFreezeRightEdge && !cell.style?.borderRight) {
++    style.borderRight = '2px solid #2563eb'
++  }
+ 
+   return style
+ }
+@@ -1329,7 +4915,8 @@ function buildCellTdStyle(cell) {
+ function buildCellClass(cell) {
+   return {
+     selected: isCellSelected(cell),
+-    'has-validation': hasValidationOptions(cell)
++    'has-validation': hasValidationOptions(cell),
++    'fill-preview': isCellInFillPreview(cell)
+   }
+ }
+ 
+@@ -1342,26 +4929,32 @@ function buildRowIndexStyle(row) {
+   if (!sheet) {
+     return style
+   }
+-  const freezeRows = Math.max(Number(sheet.freezePane?.ySplit ?? 0), 0)
++  const freezeRows = Math.max(Number(sheet.freezePane?.ySplit || 0), 0)
+   if (row.rowIndex < freezeRows) {
+     style.top = `${COLUMN_HEADER_HEIGHT + resolveFrozenTopOffset(sheet, row.rowIndex)}px`
+     style.zIndex = 7
+   }
++  if (freezeRows > 0 && row.rowIndex === freezeRows - 1) {
++    style.borderBottom = '2px solid #2563eb'
++  }
+   return style
+ }
+ 
+ function buildColumnHeaderStyle(sheet, columnIndex) {
+-  const width = Math.max(Number(sheet?.columnWidths?.[columnIndex] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
++  const width = Math.max(Number(sheet?.columnWidths?.[columnIndex] || DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+   const style = {
+     width: `${width}px`,
+     minWidth: `${width}px`,
+     height: `${COLUMN_HEADER_HEIGHT}px`
+   }
+-  const freezeColumns = Math.max(Number(sheet?.freezePane?.xSplit ?? 0), 0)
++  const freezeColumns = Math.max(Number(sheet?.freezePane?.xSplit || 0), 0)
+   if (columnIndex < freezeColumns) {
+     style.left = `${ROW_INDEX_WIDTH + resolveFrozenLeftOffset(sheet, columnIndex)}px`
+     style.zIndex = 10
+   }
++  if (freezeColumns > 0 && columnIndex === freezeColumns - 1) {
++    style.borderRight = '2px solid #2563eb'
++  }
+   return style
+ }
+ 
+@@ -1383,7 +4976,7 @@ function buildCellInputStyle(cell) {
+ function resolveFrozenTopOffset(sheet, rowIndex) {
+   let total = 0
+   for (let index = 0; index < rowIndex; index += 1) {
+-    total += Math.max(Number(sheet.rowHeights[index] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
++    total += Math.max(Number(sheet.rowHeights[index] || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+   }
+   return total
+ }
+@@ -1391,7 +4984,7 @@ function resolveFrozenTopOffset(sheet, rowIndex) {
+ function resolveFrozenLeftOffset(sheet, columnIndex) {
+   let total = 0
+   for (let index = 0; index < columnIndex; index += 1) {
+-    total += Math.max(Number(sheet.columnWidths[index] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
++    total += Math.max(Number(sheet.columnWidths[index] || DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+   }
+   return total
+ }
+@@ -1401,9 +4994,9 @@ function resolveSheetPixelWidth(sheet) {
+     return ROW_INDEX_WIDTH + DEFAULT_COLUMN_WIDTH
+   }
+   let total = ROW_INDEX_WIDTH
+-  const maxColumnCount = Math.max(Number(sheet.maxColumnCount ?? 0), 1)
++  const maxColumnCount = Math.max(Number(sheet.maxColumnCount || 0), 1)
+   for (let index = 0; index < maxColumnCount; index += 1) {
+-    total += Math.max(Number(sheet.columnWidths[index] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
++    total += Math.max(Number(sheet.columnWidths[index] || DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+   }
+   return total
+ }
+@@ -1413,9 +5006,9 @@ function resolveSheetPixelHeight(sheet) {
+     return COLUMN_HEADER_HEIGHT + DEFAULT_ROW_HEIGHT
+   }
+   let total = COLUMN_HEADER_HEIGHT
+-  const rowCount = Math.max(Number(sheet.rowCount ?? 0), 1)
++  const rowCount = Math.max(Number(sheet.rowCount || 0), 1)
+   for (let index = 0; index < rowCount; index += 1) {
+-    total += Math.max(Number(sheet.rowHeights[index] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
++    total += Math.max(Number(sheet.rowHeights[index] || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+   }
+   return total
+ }
+@@ -1434,6 +5027,8 @@ function startColumnResize(colIndex, event) {
+   if (!currentSheet.value) {
+     return
+   }
++  stopFillHandleDrag(false)
++  pushUndoSnapshot()
+   event.preventDefault()
+   event.stopPropagation()
+   const sheet = currentSheet.value
+@@ -1441,7 +5036,7 @@ function startColumnResize(colIndex, event) {
+     sheetName: sheet.name,
+     colIndex,
+     startX: Number(event.clientX || 0),
+-    startWidth: Math.max(Number(sheet.columnWidths[colIndex] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
++    startWidth: Math.max(Number(sheet.columnWidths[colIndex] || DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+   }
+   rowResizeState.value = null
+   document.body.style.cursor = 'col-resize'
+@@ -1453,6 +5048,8 @@ function startRowResize(rowIndex, event) {
+   if (!currentSheet.value) {
+     return
+   }
++  stopFillHandleDrag(false)
++  pushUndoSnapshot()
+   event.preventDefault()
+   event.stopPropagation()
+   const sheet = currentSheet.value
+@@ -1460,7 +5057,7 @@ function startRowResize(rowIndex, event) {
+     sheetName: sheet.name,
+     rowIndex,
+     startY: Number(event.clientY || 0),
+-    startHeight: Math.max(Number(sheet.rowHeights[rowIndex] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
++    startHeight: Math.max(Number(sheet.rowHeights[rowIndex] || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+   }
+   columnResizeState.value = null
+   document.body.style.cursor = 'row-resize'
+@@ -1525,7 +5122,7 @@ function updateCellsForRowResize(sheet, rowIndex) {
+ function resolveRangeWidthFast(sheet, startColumnIndex, colSpan) {
+   let total = 0
+   for (let offset = 0; offset < colSpan; offset += 1) {
+-    total += Math.max(Number(sheet.columnWidths[startColumnIndex + offset] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
++    total += Math.max(Number(sheet.columnWidths[startColumnIndex + offset] || DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+   }
+   return total
+ }
+@@ -1533,7 +5130,7 @@ function resolveRangeWidthFast(sheet, startColumnIndex, colSpan) {
+ function resolveRangeHeightFast(sheet, startRowIndex, rowSpan) {
+   let total = 0
+   for (let offset = 0; offset < rowSpan; offset += 1) {
+-    total += Math.max(Number(sheet.rowHeights[startRowIndex + offset] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
++    total += Math.max(Number(sheet.rowHeights[startRowIndex + offset] || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+   }
+   return total
+ }
+@@ -1554,6 +5151,180 @@ function normalizeValue(value) {
+   return value == null ? '' : String(value)
+ }
+ 
++function normalizeHexColor(value) {
++  const text = normalizeValue(value).trim()
++  const matched = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
++  if (!matched) {
++    return ''
++  }
++  let hex = matched[1].toUpperCase()
++  if (hex.length === 3) {
++    hex = hex.split('').map((char) => `${char}${char}`).join('')
++  }
++  return `#${hex}`
++}
++
++function normalizeColorStyleValue(value) {
++  const hex = normalizeHexColor(value)
++  if (hex) {
++    return hex
++  }
++  return convertRgbColorToHex(value)
++}
++
++function convertRgbColorToHex(value) {
++  const text = normalizeValue(value).trim()
++  const matched = text.match(/^rgba?\(([^)]+)\)$/i)
++  if (!matched) {
++    return ''
++  }
++  const segments = matched[1]
++    .split(',')
++    .map((segment) => Number.parseFloat(segment.trim()))
++  if (segments.length < 3) {
++    return ''
++  }
++  if (segments.some((segment) => Number.isNaN(segment))) {
++    return ''
++  }
++  const [red, green, blue] = segments
++  const toHex = (channel) => {
++    const safe = Math.min(255, Math.max(0, Math.round(channel)))
++    return safe.toString(16).padStart(2, '0').toUpperCase()
++  }
++  return `#${toHex(red)}${toHex(green)}${toHex(blue)}`
++}
++
++function normalizeEditableStyleValue(key, value) {
++  const text = normalizeValue(value).trim()
++  if (!text) {
++    return ''
++  }
++  switch (key) {
++    case 'textAlign': {
++      const lower = text.toLowerCase()
++      if (lower === 'left') {
++        return ''
++      }
++      return ['center', 'right', 'justify'].includes(lower) ? lower : ''
++    }
++    case 'verticalAlign': {
++      const lower = text.toLowerCase()
++      if (lower === 'top') {
++        return ''
++      }
++      return ['middle', 'bottom'].includes(lower) ? lower : ''
++    }
++    case 'color':
++    case 'backgroundColor':
++      return normalizeColorStyleValue(text)
++    case 'fontWeight': {
++      const lower = text.toLowerCase()
++      return lower === '700' || lower === 'bold' ? '700' : ''
++    }
++    case 'fontStyle':
++      return text.toLowerCase() === 'italic' ? 'italic' : ''
++    case 'textDecoration':
++      return text.toLowerCase().includes('underline') ? 'underline' : ''
++    case 'fontSize': {
++      const matched = text.match(/^(\d+(?:\.\d+)?)\s*pt$/i)
++      if (!matched) {
++        return ''
++      }
++      const sizeValue = Number(matched[1])
++      if (!Number.isFinite(sizeValue) || sizeValue < 6 || sizeValue > 72) {
++        return ''
++      }
++      return `${sizeValue}pt`
++    }
++    case 'fontFamily':
++      return text
++    case 'whiteSpace':
++      return text === 'pre-wrap' ? 'pre-wrap' : ''
++    case 'borderTop':
++    case 'borderRight':
++    case 'borderBottom':
++    case 'borderLeft': {
++      if (text.toLowerCase() === 'none') {
++        return ''
++      }
++      const matched = text.match(/^(\d+(?:\.\d+)?)px\s+(solid|dashed|dotted)\s+(.+)$/i)
++      if (!matched) {
++        return ''
++      }
++      const width = Number(matched[1])
++      if (!Number.isFinite(width) || width <= 0 || width > 8) {
++        return ''
++      }
++      const color = normalizeColorStyleValue(matched[3])
++      if (!color) {
++        return ''
++      }
++      return `${Math.round(width)}px ${matched[2].toLowerCase()} ${color}`
++    }
++    case 'numberFormat': {
++      const lower = text.toLowerCase()
++      if (['percent', 'date', 'number'].includes(lower)) {
++        return lower
++      }
++      return ''
++    }
++    default:
++      return text
++  }
++}
++
++function sanitizeEditableStyle(style) {
++  const source = style && typeof style === 'object' ? style : {}
++  const normalized = {}
++  for (const key of EDITABLE_STYLE_KEYS) {
++    const nextValue = normalizeEditableStyleValue(key, source[key])
++    if (nextValue !== '') {
++      normalized[key] = nextValue
++    }
++  }
++  return normalized
++}
++
++function cloneCellStyle(style) {
++  return style && typeof style === 'object' ? { ...style } : {}
++}
++
++function buildStylePatchPayload(style) {
++  const source = style && typeof style === 'object' ? style : {}
++  const payload = {}
++  for (const key of EDITABLE_STYLE_KEYS) {
++    payload[key] = normalizeEditableStyleValue(key, source[key])
++  }
++  return payload
++}
++
++function hasStyleChanged(cell) {
++  const currentStyle = sanitizeEditableStyle(cell?.style)
++  const originalStyle = sanitizeEditableStyle(cell?.originalStyle)
++  return JSON.stringify(currentStyle) !== JSON.stringify(originalStyle)
++}
++
++function applyCellStyleChange(sheet, cell, stylePatch) {
++  if (!sheet || !cell || !stylePatch || typeof stylePatch !== 'object') {
++    return
++  }
++  const nextStyle = cloneCellStyle(cell.style)
++  for (const [styleKey, styleValue] of Object.entries(stylePatch)) {
++    if (!EDITABLE_STYLE_KEYS.includes(styleKey)) {
++      continue
++    }
++    const normalized = normalizeEditableStyleValue(styleKey, styleValue)
++    if (normalized === '') {
++      delete nextStyle[styleKey]
++    } else {
++      nextStyle[styleKey] = normalized
++    }
++  }
++  cell.style = nextStyle
++  applyCellDirtyChange(sheet, cell, cell.value)
++}
++
+ function normalizeQueryFileName(value) {
+   if (Array.isArray(value)) {
+     return value[0] || ''
+@@ -1593,7 +5364,7 @@ function formatSelectionRange(range) {
+ 
+ function toColumnLabel(columnIndex) {
+   let label = ''
+-  let current = Math.max(Number(columnIndex ?? 0), 0) + 1
++  let current = Math.max(Number(columnIndex || 0), 0) + 1
+   while (current > 0) {
+     const remainder = (current - 1) % 26
+     label = String.fromCharCode(65 + remainder) + label
+@@ -1616,15 +5387,15 @@ function ensureSheetBounds(sheet, requiredRowCount, requiredColumnCount) {
+   if (!sheet.freezePane) {
+     sheet.freezePane = normalizeFreezePane(null)
+   }
+-  sheet.freezePane.xSplit = Math.min(Math.max(Number(sheet.freezePane.xSplit ?? 0), 0), sheet.maxColumnCount)
+-  sheet.freezePane.ySplit = Math.min(Math.max(Number(sheet.freezePane.ySplit ?? 0), 0), sheet.rowCount)
++  sheet.freezePane.xSplit = Math.min(Math.max(Number(sheet.freezePane.xSplit || 0), 0), sheet.maxColumnCount)
++  sheet.freezePane.ySplit = Math.min(Math.max(Number(sheet.freezePane.ySplit || 0), 0), sheet.rowCount)
+ }
+ 
+ function resolveRangeWidth(sheet, startColumnIndex, colSpan) {
+   ensureSheetBounds(sheet, sheet.rowCount, startColumnIndex + colSpan)
+   let total = 0
+   for (let offset = 0; offset < colSpan; offset += 1) {
+-    total += Math.max(Number(sheet.columnWidths[startColumnIndex + offset] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
++    total += Math.max(Number(sheet.columnWidths[startColumnIndex + offset] || DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+   }
+   return total
+ }
+@@ -1633,7 +5404,7 @@ function resolveRangeHeight(sheet, startRowIndex, rowSpan) {
+   ensureSheetBounds(sheet, startRowIndex + rowSpan, sheet.maxColumnCount)
+   let total = 0
+   for (let offset = 0; offset < rowSpan; offset += 1) {
+-    total += Math.max(Number(sheet.rowHeights[startRowIndex + offset] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
++    total += Math.max(Number(sheet.rowHeights[startRowIndex + offset] || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+   }
+   return total
+ }
+@@ -1688,8 +5459,8 @@ function dedupeCells(cells) {
+ }
+ 
+ function rebuildSheetRows(sheet) {
+-  let rowCount = Math.max(Number(sheet.rowCount ?? 0), 1)
+-  let maxColumnCount = Math.max(Number(sheet.maxColumnCount ?? 0), 1)
++  let rowCount = Math.max(Number(sheet.rowCount || 0), 1)
++  let maxColumnCount = Math.max(Number(sheet.maxColumnCount || 0), 1)
+ 
+   for (const cell of sheet.cells) {
+     rowCount = Math.max(rowCount, cell.rowIndex + cell.rowSpan)
+@@ -1701,7 +5472,7 @@ function rebuildSheetRows(sheet) {
+ 
+   const rows = Array.from({ length: sheet.rowCount }, (_, rowIndex) => ({
+     rowIndex,
+-    heightPx: Math.max(Number(sheet.rowHeights[rowIndex] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT),
++    heightPx: Math.max(Number(sheet.rowHeights[rowIndex] || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT),
+     cells: []
+   }))
+ 
+@@ -1720,8 +5491,7 @@ function buildCellKey(rowIndex, colIndex) {
+ async function goToFileCenter() {
+   await releaseActiveLock(false)
+   router.push('/excel-editor/files')
+-}
+-</script>
++}</script>
+ 
+ <style lang="scss" scoped>
+ .excel-editor-page {
+@@ -1835,6 +5605,68 @@ h1 {
+   justify-content: flex-end;
+ }
+ 
++.style-toolbar {
++  display: flex;
++  align-items: center;
++  flex-wrap: wrap;
++  gap: 8px;
++  margin-bottom: 12px;
++  padding: 8px 10px;
++  border: 1px solid #e5e7eb;
++  border-radius: 6px;
++  background: #f9fafb;
++}
++
++.formula-toolbar {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  margin-bottom: 12px;
++  padding: 8px 10px;
++  border: 1px solid #e5e7eb;
++  border-radius: 6px;
++  background: #ffffff;
++}
++
++.formula-label {
++  min-width: 72px;
++  font-size: 12px;
++  font-weight: 600;
++  color: #4b5563;
++}
++
++.formula-input {
++  flex: 1;
++  min-width: 260px;
++}
++
++.formula-preview {
++  font-size: 12px;
++  color: #6b7280;
++  white-space: nowrap;
++}
++
++.style-toolbar-title {
++  font-size: 12px;
++  font-weight: 600;
++  color: #4b5563;
++  margin-right: 2px;
++}
++
++.style-select {
++  width: 90px;
++}
++
++.style-color-picker {
++  :deep(.el-color-picker__trigger) {
++    border-color: #d1d5db;
++  }
++}
++
++.underline-btn {
++  text-decoration: underline;
++}
++
+ .selection-tip {
+   font-size: 12px;
+   color: #4b5563;
+@@ -1844,9 +5676,17 @@ h1 {
+   margin-bottom: 12px;
+ }
+ 
++.sheet-actions {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 8px;
++  margin-bottom: 12px;
++}
++
+ .grid-wrap {
+   overflow: auto;
+-  max-height: calc(100vh - 390px);
++  max-height: calc(100vh - 300px);
++  min-height: 500px;
+   border: 1px solid #e5e7eb;
+   border-radius: 6px;
+   background: #fff;
+@@ -1948,6 +5788,45 @@ h1 {
+   background: rgba(37, 99, 235, 0.04);
+ }
+ 
++.sheet-cell.fill-preview {
++  background: rgba(16, 185, 129, 0.08);
++  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.45);
++}
++
++.filter-trigger {
++  position: absolute;
++  top: 3px;
++  right: 3px;
++  width: 16px;
++  height: 16px;
++  border: 1px solid #d1d5db;
++  border-radius: 4px;
++  background: #ffffff;
++  color: #6b7280;
++  font-size: 11px;
++  line-height: 1;
++  cursor: pointer;
++}
++
++.filter-trigger:hover {
++  color: #2563eb;
++  border-color: #93c5fd;
++  background: #eff6ff;
++}
++
++.fill-handle {
++  position: absolute;
++  right: -4px;
++  bottom: -4px;
++  width: 8px;
++  height: 8px;
++  border: 1px solid #ffffff;
++  border-radius: 2px;
++  background: #2563eb;
++  cursor: crosshair;
++  z-index: 18;
++}
++
+ .row-index {
+   position: sticky;
+   left: 0;
+@@ -2018,6 +5897,91 @@ h1 {
+   box-shadow: inset 0 0 0 1px rgba(47, 119, 208, 0.14);
+ }
+ 
++.sheet-context-menu {
++  position: fixed;
++  z-index: 3000;
++  min-width: 156px;
++  border: 1px solid #d1d5db;
++  border-radius: 6px;
++  background: #fff;
++  box-shadow: 0 6px 20px rgba(17, 24, 39, 0.16);
++  overflow: hidden;
++}
++
++.sheet-context-menu button {
++  display: block;
++  width: 100%;
++  padding: 8px 12px;
++  border: none;
++  background: transparent;
++  text-align: left;
++  font-size: 13px;
++  color: #1f2937;
++  cursor: pointer;
++}
++
++.sheet-context-menu button:hover {
++  background: #eff6ff;
++}
++
++.sort-rule-list {
++  display: flex;
++  flex-direction: column;
++  gap: 8px;
++  max-height: 240px;
++  overflow: auto;
++  padding-right: 2px;
++}
++
++.sort-rule-item {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++}
++
++.sort-rule-column {
++  width: 160px;
++}
++
++.sort-rule-direction {
++  width: 120px;
++}
++
++.filter-value-box {
++  width: 100%;
++  max-height: 220px;
++  overflow: auto;
++  border: 1px solid #e5e7eb;
++  border-radius: 6px;
++  padding: 8px 10px;
++}
++
++.find-options {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 12px;
++}
++
++.shortcut-grid {
++  display: flex;
++  flex-direction: column;
++  gap: 10px;
++}
++
++.shortcut-item {
++  display: flex;
++  align-items: center;
++  gap: 10px;
++}
++
++.shortcut-item code {
++  min-width: 160px;
++  padding: 2px 8px;
++  border-radius: 4px;
++  background: #f3f4f6;
++  color: #111827;
++}
++
+ @media (max-width: 1200px) {
+   .summary-grid {
+     grid-template-columns: 1fr;
+@@ -2031,9 +5995,25 @@ h1 {
+ 
+   .hero-card,
+   .toolbar,
+-  .toolbar-right {
++  .toolbar-right,
++  .style-toolbar,
++  .formula-toolbar {
+     flex-direction: column;
+     align-items: flex-start;
+   }
++
++  .formula-preview {
++    white-space: normal;
++  }
++
++  .grid-wrap {
++    min-height: 360px;
++  }
+ }
+ </style>
++
++
++
++
++
++
+

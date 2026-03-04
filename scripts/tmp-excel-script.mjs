@@ -1,477 +1,4 @@
-<template>
-  <div class="excel-editor-page">
-    <section class="hero-card">
-      <div>
-        <p class="eyebrow">在线表格编辑器</p>
-        <h1>在线 Excel 编辑器</h1>
-        <p class="hero-desc">
-          支持样式保留、数据验证、筛选排序、冻结窗格、格式刷与拖拽填充。
-        </p>
-      </div>
-      <div class="hero-actions">
-        <el-button @click="goToFileCenter">返回文件管理</el-button>
-        <el-button :loading="loadingServerFile" :disabled="!currentFileName" @click="reloadWorkbook">重新加载</el-button>
-        <el-button type="success" :loading="saving" :disabled="!hasWorkbook" @click="saveToServer">在线保存</el-button>
-        <el-button :disabled="!currentFileName" @click="downloadServerWorkbook">下载文件</el-button>
-      </div>
-    </section>
-
-    <section class="summary-grid">
-      <article class="summary-card">
-        <span class="summary-label">当前文件</span>
-        <strong>{{ currentFileName || '未选择' }}</strong>
-        <span>{{ workbookName }}</span>
-      </article>
-      <article class="summary-card">
-        <span class="summary-label">工作表</span>
-        <strong>{{ currentSheet ? currentSheet.name : '未加载' }}</strong>
-        <span>{{ sheets.length }} 个工作表</span>
-      </article>
-      <article class="summary-card">
-        <span class="summary-label">保存状态</span>
-        <strong>{{ isDirty ? `未保存修改：${dirtyCount}` : '已同步' }}</strong>
-        <span>{{ isDirty ? '当前有修改尚未保存' : '当前内容与服务器一致' }}</span>
-      </article>
-    </section>
-
-    <section class="editor-shell" v-loading="pageLoading">
-      <template v-if="hasWorkbook">
-        <div class="toolbar">
-          <div class="toolbar-left">
-            <el-tag type="info" effect="light">文件：{{ currentFileName }}</el-tag>
-            <el-tag :type="isDirty ? 'warning' : 'success'" effect="light">{{ isDirty ? '未保存' : '已保存' }}</el-tag>
-            <el-tag v-if="lockStatusLabel" :type="lockState.self ? 'success' : 'warning'" effect="light">{{ lockStatusLabel }}</el-tag>
-          </div>
-          <div class="toolbar-right">
-            <span class="selection-tip">{{ selectionLabel }}</span>
-            <el-button size="small" :disabled="!canUndo" @click="undoLastAction">撤销</el-button>
-            <el-button size="small" :disabled="!canRedo" @click="redoLastAction">重做</el-button>
-            <el-button size="small" :disabled="!activeSelection" @click="copySelection(false)">复制</el-button>
-            <el-button size="small" :disabled="!activeSelection" @click="copySelection(true)">剪切</el-button>
-            <el-button size="small" :disabled="!activeSelection" @click="pasteToSelection">粘贴</el-button>
-            <el-button size="small" @click="openFindReplaceDialog">查找替换</el-button>
-            <el-button size="small" :disabled="!canMergeSelection" @click="mergeSelectedCells">合并</el-button>
-            <el-button size="small" :disabled="!canUnmergeSelection" @click="unmergeSelectedCells">取消合并</el-button>
-            <el-button size="small" :disabled="!activeSelection" @click="insertRowAbove">上方插行</el-button>
-            <el-button size="small" :disabled="!activeSelection" @click="insertRowBelow">下方插行</el-button>
-            <el-button size="small" :disabled="!activeSelection" @click="deleteSelectedRows">删除行</el-button>
-            <el-button size="small" :disabled="!activeSelection" @click="insertColumnLeft">左侧插列</el-button>
-            <el-button size="small" :disabled="!activeSelection" @click="insertColumnRight">右侧插列</el-button>
-            <el-button size="small" :disabled="!activeSelection" @click="deleteSelectedColumns">删除列</el-button>
-          </div>
-        </div>
-
-        <div class="style-toolbar">
-          <span class="style-toolbar-title">文本</span>
-          <el-button size="small" :disabled="!activeSelection" @click="toggleBold"><strong>B</strong></el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="toggleItalic"><em>I</em></el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="toggleUnderline"><span class="underline-btn">U</span></el-button>
-          <el-select
-            class="style-select"
-            size="small"
-            :model-value="fontSizePicker"
-            :disabled="!activeSelection"
-            placeholder="字号"
-            @change="applyFontSize"
-          >
-            <el-option
-              v-for="size in FONT_SIZE_OPTIONS"
-              :key="`font-size-${size}`"
-              :label="`${size}pt`"
-              :value="`${size}pt`"
-            />
-          </el-select>
-          <el-button size="small" :disabled="!activeSelection" @click="applyHorizontalAlign('left')">左对齐</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="applyHorizontalAlign('center')">居中</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="applyHorizontalAlign('right')">右对齐</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="applyVerticalAlign('top')">顶对齐</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="applyVerticalAlign('middle')">中对齐</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="applyVerticalAlign('bottom')">底对齐</el-button>
-          <el-color-picker
-            class="style-color-picker"
-            size="small"
-            v-model="textColorPicker"
-            :disabled="!activeSelection"
-            :show-alpha="false"
-            @update:model-value="handleTextColorModelValueChange"
-            @change="handleTextColorChange"
-          />
-          <el-button size="small" :disabled="!activeSelection" @click="clearTextColor">清文字色</el-button>
-          <el-color-picker
-            class="style-color-picker"
-            size="small"
-            v-model="fillColorPicker"
-            :disabled="!activeSelection"
-            :show-alpha="false"
-            @update:model-value="handleFillColorModelValueChange"
-            @change="handleFillColorChange"
-          />
-          <el-button size="small" :disabled="!activeSelection" @click="clearFillColor">清背景色</el-button>
-          <el-button
-            size="small"
-            :type="formatPainterActive ? 'primary' : 'default'"
-            :disabled="!canUseFormatPainter"
-            @click="toggleFormatPainter"
-          >
-            格式刷
-          </el-button>
-          <span class="style-toolbar-title">边框</span>
-          <el-button size="small" :disabled="!activeSelection" @click="applyBorderToSelection('all')">全边框</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="applyBorderToSelection('outer')">外边框</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="applyBorderToSelection('clear')">清边框</el-button>
-          <span class="style-toolbar-title">数字</span>
-          <el-button size="small" :disabled="!activeSelection" @click="formatSelectionAsPercent">百分比</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="formatSelectionAsDate">日期</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="increaseSelectionDecimals">增小数</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="decreaseSelectionDecimals">减小数</el-button>
-          <span class="style-toolbar-title">排序</span>
-          <el-button size="small" :disabled="!activeSelection" @click="sortSelection('asc')">升序</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="sortSelection('desc')">降序</el-button>
-          <el-switch v-model="sortHasHeader" size="small" active-text="有表头" inactive-text="无表头" />
-          <el-button size="small" :disabled="!activeSelection" @click="openSortDialog">多条件排序</el-button>
-          <span class="style-toolbar-title">筛选</span>
-          <el-button size="small" :disabled="!activeSelection" @click="toggleAutoFilter">启用筛选</el-button>
-          <el-button size="small" :disabled="!hasActiveFilter" @click="clearAutoFilter">清除筛选</el-button>
-          <el-button size="small" :disabled="!canOpenColumnFilter" @click="openColumnFilterDialogBySelection">列筛选</el-button>
-          <span class="style-toolbar-title">冻结</span>
-          <el-button size="small" :disabled="!currentSheet" @click="freezeFirstRow">冻结首行</el-button>
-          <el-button size="small" :disabled="!currentSheet" @click="freezeFirstColumn">冻结首列</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="freezeBySelection">冻结到选区</el-button>
-          <el-button size="small" :disabled="!currentSheet" @click="openFreezeDialog">自定义冻结</el-button>
-          <el-button size="small" :disabled="!currentSheet" @click="clearFreezePane">取消冻结</el-button>
-          <el-button size="small" @click="shortcutDialogVisible = true">快捷键</el-button>
-        </div>
-
-        <div class="formula-toolbar">
-          <span class="formula-label">{{ activeCellLabel }}</span>
-          <el-input
-            v-model="formulaInput"
-            class="formula-input"
-            clearable
-            :disabled="!activePrimaryCell"
-            placeholder="输入值或公式（以 = 开头）"
-            @focus="formulaBarFocused = true"
-            @blur="formulaBarFocused = false"
-            @keydown.enter.prevent="applyFormulaBarInput(false)"
-          />
-          <el-button size="small" :disabled="!activePrimaryCell" @click="applyFormulaBarInput(false)">应用</el-button>
-          <el-button size="small" :disabled="!activeSelection" @click="applyFormulaBarInput(true)">填充选区</el-button>
-          <span class="formula-preview">{{ formulaPreview }}</span>
-        </div>
-
-        <el-tabs v-model="activeSheetName" class="sheet-tabs">
-          <el-tab-pane
-            v-for="sheet in sheets"
-            :key="sheet.name"
-            :label="sheet.name"
-            :name="sheet.name"
-          />
-        </el-tabs>
-        <div class="sheet-actions">
-          <el-button size="small" @click="createSheet">新建工作表</el-button>
-          <el-button size="small" :disabled="!currentSheet" @click="renameCurrentSheet">重命名</el-button>
-          <el-button size="small" :disabled="!currentSheet" @click="copyCurrentSheet">复制工作表</el-button>
-          <el-button size="small" :disabled="!canDeleteCurrentSheet" @click="deleteCurrentSheet">删除工作表</el-button>
-          <el-button size="small" :disabled="!currentSheet || !canMoveCurrentSheetLeft" @click="moveCurrentSheetLeft">左移</el-button>
-          <el-button size="small" :disabled="!currentSheet || !canMoveCurrentSheetRight" @click="moveCurrentSheetRight">右移</el-button>
-        </div>
-
-        <div
-          v-if="currentSheet"
-          ref="gridWrapRef"
-          class="grid-wrap"
-          @scroll.passive="handleGridScroll"
-        >
-          <div class="sheet-stage" :style="buildSheetStageStyle(currentSheet)">
-            <div v-if="hasBackgroundImages(currentSheet)" class="sheet-image-layer sheet-image-layer-background">
-              <div
-                v-for="(image, imageIndex) in listBackgroundImages(currentSheet)"
-                :key="buildImageKey(image, imageIndex)"
-                class="sheet-image-item background"
-                :style="buildImageStyle(image)"
-              >
-                <img class="sheet-image" :src="image.src" :alt="image.description || ''" loading="lazy" decoding="async" draggable="false" />
-              </div>
-            </div>
-
-            <table class="sheet-grid">
-              <thead>
-                <tr>
-                  <th class="corner-header"></th>
-                  <th
-                    v-for="columnIndex in currentSheet.maxColumnCount"
-                    :key="`header-col-${columnIndex}`"
-                    class="column-header"
-                    :style="buildColumnHeaderStyle(currentSheet, columnIndex - 1)"
-                    @contextmenu.prevent="openContextMenu($event, { rowIndex: 0, colIndex: columnIndex - 1 })"
-                  >
-                    <span class="column-label">{{ toColumnLabel(columnIndex - 1) }}</span>
-                    <span
-                      class="resize-handle col-resize-handle"
-                      @mousedown="startColumnResize(columnIndex - 1, $event)"
-                    ></span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in visibleRows" :key="`row-${row.rowIndex}`">
-                  <td class="row-index" :style="buildRowIndexStyle(row)" @contextmenu.prevent="openContextMenu($event, { rowIndex: row.rowIndex, colIndex: 0 })">
-                    {{ row.rowIndex + 1 }}
-                    <span
-                      class="resize-handle row-resize-handle"
-                      @mousedown="startRowResize(row.rowIndex, $event)"
-                    ></span>
-                  </td>
-                  <td
-                    v-for="cell in row.cells"
-                    :key="`cell-${row.rowIndex}-${cell.colIndex}`"
-                    class="sheet-cell"
-                    :class="buildCellClass(cell)"
-                    :colspan="cell.colSpan"
-                    :rowspan="cell.rowSpan"
-                    :style="buildCellTdStyle(cell)"
-                    :data-row-index="cell.rowIndex"
-                    :data-col-index="cell.colIndex"
-                    @click="handleCellSelection(cell, $event)"
-                    @contextmenu.prevent="openContextMenu($event, cell)"
-                  >
-                    <template v-if="hasValidationOptions(cell)">
-                      <select
-                        v-model="cell.value"
-                        class="cell-input cell-select"
-                        :class="{ dirty: cell.dirty, formula: cell.formula }"
-                        :style="buildCellInputStyle(cell)"
-                        @focus="handleCellFocus(cell)"
-                        @blur="handleCellBlur(cell)"
-                        @change="handleCellInput(cell)"
-                      >
-                        <option v-if="cell.validationAllowBlank" value=""></option>
-                        <option
-                          v-if="shouldKeepCurrentValidationValue(cell)"
-                          :value="cell.value"
-                        >
-                          {{ cell.value }}
-                        </option>
-                        <option
-                          v-for="option in cell.validationOptions"
-                          :key="`list-${cell.rowIndex}-${cell.colIndex}-${option}`"
-                          :value="option"
-                        >
-                          {{ option }}
-                        </option>
-                      </select>
-                    </template>
-                    <textarea
-                      v-else
-                      v-model="cell.value"
-                      class="cell-input"
-                      :class="{ dirty: cell.dirty, formula: cell.formula }"
-                      :style="buildCellInputStyle(cell)"
-                      :maxlength="MAX_CELL_TEXT_LENGTH"
-                      :wrap="cell.style?.whiteSpace === 'pre-wrap' ? 'soft' : 'off'"
-                      spellcheck="false"
-                      @focus="handleCellFocus(cell)"
-                      @blur="handleCellBlur(cell)"
-                      @input="handleCellInput(cell)"
-                    />
-                    <button
-                      v-if="isFilterHeaderCell(cell)"
-                      type="button"
-                      class="filter-trigger"
-                      title="筛选"
-                      @click.stop="openColumnFilterDialog(cell.colIndex)"
-                    >
-                      ▾
-                    </button>
-                    <span
-                      v-if="isFillHandleCell(cell)"
-                      class="fill-handle"
-                      title="拖拽填充"
-                      @mousedown.stop.prevent="startFillHandleDrag($event)"
-                    ></span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div v-if="hasAnchoredImages(currentSheet)" class="sheet-image-layer sheet-image-layer-foreground">
-              <div
-                v-for="(image, imageIndex) in listAnchoredImages(currentSheet)"
-                :key="buildImageKey(image, imageIndex)"
-                class="sheet-image-item anchored"
-                :style="buildImageStyle(image)"
-              >
-                <img class="sheet-image" :src="image.src" :alt="image.description || ''" loading="lazy" decoding="async" draggable="false" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <el-empty v-else description="请先从文件管理中选择一个 Excel 文件" />
-    </section>
-
-    <el-dialog v-model="findDialogVisible" title="查找与替换" width="460px" destroy-on-close>
-      <el-form label-width="92px">
-        <el-form-item label="查找">
-          <el-input v-model="findForm.findText" placeholder="输入要查找的内容" />
-        </el-form-item>
-        <el-form-item label="替换为">
-          <el-input v-model="findForm.replaceText" placeholder="输入替换内容" />
-        </el-form-item>
-        <el-form-item label="范围">
-          <el-radio-group v-model="findForm.scope">
-            <el-radio label="sheet">当前工作表</el-radio>
-            <el-radio label="workbook">整个工作簿</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="选项">
-          <div class="find-options">
-            <el-checkbox v-model="findForm.matchCase">区分大小写</el-checkbox>
-            <el-checkbox v-model="findForm.wholeWord">整词匹配</el-checkbox>
-            <el-checkbox v-model="findForm.selectionOnly" :disabled="!activeSelection || findForm.scope === 'workbook'">
-              仅当前选区
-            </el-checkbox>
-          </div>
-        </el-form-item>
-        <el-form-item label="预览">
-          <el-tag type="info" effect="light">预计匹配 {{ findPreviewCount }} 项</el-tag>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="findDialogVisible = false">关闭</el-button>
-        <el-button @click="previewFindMatches">预览匹配</el-button>
-        <el-button @click="findNext">查找下一个</el-button>
-        <el-button type="primary" :disabled="findPreviewCount <= 0" @click="replaceAll">全部替换</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="sortDialogVisible" title="多条件排序" width="520px" destroy-on-close>
-      <el-form label-width="88px">
-        <el-form-item label="排序区域">
-          <el-input :model-value="sortDialogRangeLabel" readonly />
-        </el-form-item>
-        <el-form-item label="表头">
-          <el-switch v-model="sortDialogHasHeader" active-text="有表头" inactive-text="无表头" />
-        </el-form-item>
-      </el-form>
-      <div class="sort-rule-list">
-        <div v-for="(rule, ruleIndex) in sortRules" :key="`sort-rule-${ruleIndex}`" class="sort-rule-item">
-          <el-select v-model="rule.colIndex" size="small" class="sort-rule-column">
-            <el-option
-              v-for="option in sortDialogColumnOptions"
-              :key="`sort-col-${option.colIndex}`"
-              :label="option.label"
-              :value="option.colIndex"
-            />
-          </el-select>
-          <el-select v-model="rule.direction" size="small" class="sort-rule-direction">
-            <el-option label="升序" value="asc" />
-            <el-option label="降序" value="desc" />
-          </el-select>
-          <el-button size="small" :disabled="sortRules.length <= 1" @click="removeSortRule(ruleIndex)">删除</el-button>
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="addSortRule">新增条件</el-button>
-        <el-button @click="sortDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="applySortRules">应用排序</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="columnFilterDialogVisible" title="列筛选" width="520px" destroy-on-close>
-      <el-form label-width="88px">
-        <el-form-item label="筛选列">
-          <el-select v-model="filterDialogColIndex" size="small" style="width: 220px" @change="resetFilterCandidateValues">
-            <el-option
-              v-for="option in filterColumnOptions"
-              :key="`filter-col-${option.colIndex}`"
-              :label="option.label"
-              :value="option.colIndex"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="关键字">
-          <el-input v-model="filterKeyword" clearable placeholder="输入关键字过滤候选值" />
-        </el-form-item>
-        <el-form-item label="候选值">
-          <div class="filter-value-box">
-            <el-checkbox-group v-model="filterSelectedValues">
-              <el-checkbox
-                v-for="item in filteredCandidateValues"
-                :key="`filter-value-${item.value}`"
-                :label="item.value"
-              >
-                {{ item.label }}
-              </el-checkbox>
-            </el-checkbox-group>
-          </div>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="selectAllFilterValues">全选</el-button>
-        <el-button @click="clearFilterValuesSelection">清空</el-button>
-        <el-button @click="columnFilterDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="applyColumnFilterValues">应用筛选</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="freezeDialogVisible" title="自定义冻结窗格" width="420px" destroy-on-close>
-      <el-form label-width="96px">
-        <el-form-item label="冻结行数">
-          <el-input-number
-            v-model="freezeForm.rows"
-            :min="0"
-            :max="Math.max((currentSheet?.rowCount || 1) - 1, 0)"
-            controls-position="right"
-          />
-        </el-form-item>
-        <el-form-item label="冻结列数">
-          <el-input-number
-            v-model="freezeForm.cols"
-            :min="0"
-            :max="Math.max((currentSheet?.maxColumnCount || 1) - 1, 0)"
-            controls-position="right"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="freezeDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="applyCustomFreezePane">应用</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="shortcutDialogVisible" title="Excel 常用快捷键" width="560px" destroy-on-close>
-      <div class="shortcut-grid">
-        <div v-for="item in shortcutList" :key="item.key" class="shortcut-item">
-          <code>{{ item.key }}</code>
-          <span>{{ item.desc }}</span>
-        </div>
-      </div>
-      <template #footer>
-        <el-button type="primary" @click="shortcutDialogVisible = false">我知道了</el-button>
-      </template>
-    </el-dialog>
-
-    <div
-      v-if="contextMenuState.visible"
-      class="sheet-context-menu"
-      :style="{ left: `${contextMenuState.x}px`, top: `${contextMenuState.y}px` }"
-    >
-      <button type="button" @click="insertRowAbove">上方插入行</button>
-      <button type="button" @click="insertRowBelow">下方插入行</button>
-      <button type="button" @click="deleteSelectedRows">删除所选行</button>
-      <button type="button" @click="insertColumnLeft">左侧插入列</button>
-      <button type="button" @click="insertColumnRight">右侧插入列</button>
-      <button type="button" @click="deleteSelectedColumns">删除所选列</button>
-      <button type="button" @click="copySelection(false)">复制</button>
-      <button type="button" @click="copySelection(true)">剪切</button>
-      <button type="button" @click="pasteToSelection">粘贴</button>
-    </div>
-  </div>
-</template>
-
-<script setup>
+﻿
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -501,9 +28,6 @@ const DEFAULT_EMPTY_SHEET_ROW_COUNT = 120
 const DEFAULT_EMPTY_SHEET_COLUMN_COUNT = 30
 const BORDER_LINE_STYLE = '1px solid #9CA3AF'
 const MAX_DECIMAL_SCALE = 8
-const FORMULA_RECOMPUTE_DELAY = 120
-const IMAGE_RENDER_DELAY = 120
-const IMAGE_VIEWPORT_OVERSCAN = 640
 const EDITABLE_STYLE_KEYS = [
   'textAlign',
   'verticalAlign',
@@ -526,7 +50,7 @@ const FONT_SIZE_OPTIONS = [10, 11, 12, 14, 16, 18, 20, 24, 28, 32]
 const route = useRoute()
 const router = useRouter()
 
-const workbookName = ref('未命名工作簿')
+const workbookName = ref('鏈姞杞?)
 const sheets = ref([])
 const activeSheetName = ref('')
 const currentFileName = ref('')
@@ -541,17 +65,6 @@ const selection = ref(null)
 const showedCellLimitHint = ref(false)
 const columnResizeState = ref(null)
 const rowResizeState = ref(null)
-const gridWrapRef = ref(null)
-const gridViewportRafId = ref(0)
-const gridViewportState = ref({
-  top: 0,
-  left: 0,
-  width: 0,
-  height: 0
-})
-const imageRenderDelayTimer = ref(0)
-const imageRenderSheetName = ref('')
-const imageRenderReady = ref(false)
 const lockState = ref({
   fileName: '',
   ownerUsername: '',
@@ -562,8 +75,6 @@ const lockHeartbeatTimer = ref(null)
 const autoSaveTimer = ref(null)
 const lockWarningShown = ref(false)
 const dirtyRefreshRafId = ref(0)
-const formulaRecomputeTimer = ref(0)
-const formulaRecomputeSheetName = ref('')
 const undoStack = ref([])
 const redoStack = ref([])
 const applyingHistory = ref(false)
@@ -610,18 +121,18 @@ const freezeForm = ref({
 const fillDragState = ref(null)
 const shortcutDialogVisible = ref(false)
 const shortcutList = Object.freeze([
-  { key: 'Ctrl+S', desc: '保存' },
-  { key: 'Ctrl+Z / Ctrl+Y', desc: '撤销 / 重做' },
-  { key: 'Ctrl+C / Ctrl+X / Ctrl+V', desc: '复制 / 剪切 / 粘贴' },
-  { key: 'Ctrl+Shift+ArrowDown', desc: '从当前单元格向下选到数据末尾' },
-  { key: 'Shift+拖拽', desc: '扩展连续选区' },
-  { key: 'Ctrl+Shift+L', desc: '开关筛选' },
-  { key: 'Alt+S', desc: '快速升序排序' },
-  { key: 'Alt+Shift+ArrowUp / Alt+Shift+ArrowDown', desc: '移动工作表标签' },
-  { key: 'Alt+ArrowDown', desc: '打开当前单元格下拉列表' },
-  { key: 'F2', desc: '编辑当前单元格' },
-  { key: 'Ctrl+Enter', desc: '将编辑内容填充到整个选区' },
-  { key: 'Ctrl+F / Ctrl+H', desc: '查找 / 替换' }
+  { key: 'Ctrl+S', desc: '淇濆瓨褰撳墠宸ヤ綔绨? },
+  { key: 'Ctrl+Z / Ctrl+Y', desc: '鎾ら攢 / 閲嶅仛' },
+  { key: 'Ctrl+C / Ctrl+X / Ctrl+V', desc: '澶嶅埗 / 鍓垏 / 绮樿创' },
+  { key: 'Ctrl+Shift+鈫?, desc: '浠庡綋鍓嶅崟鍏冩牸蹇€熼€変腑鏈垪鍚戜笅鎵€鏈夊崟鍏冩牸' },
+  { key: '鎷栨嫿濉厖鏌?, desc: '鍚戜笅/鍚戝彸鎷栨嫿濉厖搴忓垪鎴栧鍒跺叕寮? },
+  { key: 'Ctrl+Shift+L', desc: '寮€鍚垨鍏抽棴鑷姩绛涢€? },
+  { key: 'Alt+S', desc: '鎵撳紑澶氬垪鎺掑簭闈㈡澘' },
+  { key: 'Alt+Shift+鈫?/ Alt+Shift+鈫?, desc: '褰撳墠閫夊尯鍗囧簭 / 闄嶅簭' },
+  { key: 'Alt+鈫?, desc: '鎵撳紑褰撳墠鍗曞厓鏍间笅鎷夊垪琛? },
+  { key: 'F2', desc: '鑱氱劍褰撳墠鍗曞厓鏍肩紪杈? },
+  { key: 'Ctrl+Enter', desc: '濉厖褰撳墠閫夊尯' },
+  { key: 'Ctrl+F / Ctrl+H', desc: '鏌ユ壘 / 鏇挎崲' }
 ])
 
 const currentSheet = computed(() => sheets.value.find((sheet) => sheet.name === activeSheetName.value) || null)
@@ -636,9 +147,9 @@ const activeSelection = computed(() => {
 })
 const selectionLabel = computed(() => {
   if (!activeSelection.value) {
-    return '未选择单元格，按住 Shift 可扩展选区'
+    return '鐐瑰嚮鍗曞厓鏍奸€夋嫨锛屾寜浣?Shift 鍙墿灞曢€夊尯'
   }
-  return `当前选区：${formatSelectionRange(activeSelection.value)}`
+  return `閫夊尯 ${formatSelectionRange(activeSelection.value)}`
 })
 const activePrimaryCell = computed(() => {
   const sheet = currentSheet.value
@@ -647,18 +158,6 @@ const activePrimaryCell = computed(() => {
     return null
   }
   return findCellByCoordinate(sheet, range.startRow, range.startCol)
-})
-const fillHandleCellKey = computed(() => {
-  const sheet = currentSheet.value
-  const range = activeSelection.value
-  if (!sheet || !range || fillDragState.value) {
-    return ''
-  }
-  const tailCell = findCellByCoordinate(sheet, range.endRow, range.endCol)
-  if (!tailCell) {
-    return ''
-  }
-  return buildCellKey(tailCell.rowIndex, tailCell.colIndex)
 })
 const activeCellLabel = computed(() => {
   const range = activeSelection.value
@@ -670,12 +169,12 @@ const activeCellLabel = computed(() => {
 const formulaPreview = computed(() => {
   const cell = activePrimaryCell.value
   if (!cell) {
-    return '无内容'
+    return '绌?
   }
   if (!cell.formula) {
-    return cell.value ? `${cell.value}` : '无内容'
+    return cell.value ? `鍊硷細${cell.value}` : '绌?
   }
-  return cell.displayValue ? `结果：${cell.displayValue}` : '公式'
+  return cell.displayValue ? `缁撴灉锛?{cell.displayValue}` : '缁撴灉锛堢┖锛?
 })
 const visibleRows = computed(() => {
   const sheet = currentSheet.value
@@ -726,7 +225,7 @@ const sortDialogColumnOptions = computed(() => {
   for (let colIndex = range.startCol; colIndex <= range.endCol; colIndex += 1) {
     options.push({
       colIndex,
-      label: `${toColumnLabel(colIndex)} 列`
+      label: `${toColumnLabel(colIndex)} 鍒梎
     })
   }
   return options
@@ -744,7 +243,7 @@ const filterColumnOptions = computed(() => {
   for (let colIndex = filterConfig.startCol; colIndex <= filterConfig.endCol; colIndex += 1) {
     options.push({
       colIndex,
-      label: `${toColumnLabel(colIndex)} 列`
+      label: `${toColumnLabel(colIndex)} 鍒梎
     })
   }
   return options
@@ -775,10 +274,10 @@ const lockStatusLabel = computed(() => {
     return ''
   }
   if (lockState.value.self) {
-    return `已锁定（你：${lockState.value.ownerUsername || '当前用户'}）`
+    return `缂栬緫閿侊細浣狅紙${lockState.value.ownerUsername || '褰撳墠鐢ㄦ埛'}锛塦
   }
   if (lockState.value.ownerUsername) {
-    return `已被 ${lockState.value.ownerUsername} 锁定`
+    return `琚?${lockState.value.ownerUsername} 閿佸畾`
   }
   return ''
 })
@@ -801,16 +300,12 @@ onMounted(async () => {
   window.addEventListener('click', hideContextMenu)
   startAutoSave()
   await initializeFromRoute()
-  scheduleGridViewportRefresh()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalKeydown, true)
   window.removeEventListener('click', hideContextMenu)
   stopFillHandleDrag(false)
-  cancelFormulaRecompute()
-  cancelImageRenderDelay()
-  cancelGridViewportRefresh()
   cancelDirtyStateRefresh()
   clearResizeState()
   stopAutoSave()
@@ -844,15 +339,11 @@ watch(
 watch(activeSheetName, () => {
   clearResizeState()
   stopFillHandleDrag(false)
-  cancelFormulaRecompute()
   clearFormatPainterState()
   clearSelection()
-  scheduleImageRenderForActiveSheet()
-  scheduleGridViewportRefresh()
 })
 
 watch(activePrimaryCell, (cell) => {
-  syncStyleToolbarState(cell)
   if (formulaBarFocused.value) {
     return
   }
@@ -875,18 +366,8 @@ async function initializeFromRoute() {
     await loadWorkbookByFileName(fallbackFileName, true)
   } catch (error) {
     clearWorkbook()
-    ElMessage.error(error?.message || '获取编辑器信息失败')
+    ElMessage.error(error?.message || '鍔犺浇鏂囦欢淇℃伅澶辫触')
   }
-}
-
-function syncStyleToolbarState(cell) {
-  const sourceStyle = cell && typeof cell.style === 'object' ? cell.style : {}
-  const fontSize = normalizeEditableStyleValue('fontSize', sourceStyle.fontSize)
-  const textColor = normalizeEditableStyleValue('color', sourceStyle.color)
-  const fillColor = normalizeEditableStyleValue('backgroundColor', sourceStyle.backgroundColor)
-  fontSizePicker.value = fontSize || '12pt'
-  textColorPicker.value = textColor || '#111827'
-  fillColorPicker.value = fillColor || '#FFFFFF'
 }
 
 async function confirmReplaceWorkbook() {
@@ -894,10 +375,10 @@ async function confirmReplaceWorkbook() {
     return true
   }
   try {
-    await ElMessageBox.confirm('当前文件有未保存修改，是否继续切换？', '提示', {
+    await ElMessageBox.confirm('褰撳墠宸ヤ綔绨挎湁鏈繚瀛樹慨鏀癸紝鍒囨崲鏂囦欢浼氫涪澶辫繖浜涙敼鍔紝鏄惁缁х画锛?, '纭鍒囨崲', {
       type: 'warning',
-      confirmButtonText: '继续切换',
-      cancelButtonText: '取消'
+      confirmButtonText: '缁х画',
+      cancelButtonText: '鍙栨秷'
     })
     return true
   } catch {
@@ -906,11 +387,6 @@ async function confirmReplaceWorkbook() {
 }
 
 function resetEditingSessionState() {
-  cancelFormulaRecompute()
-  cancelImageRenderDelay()
-  cancelGridViewportRefresh()
-  imageRenderSheetName.value = ''
-  imageRenderReady.value = false
   undoStack.value = []
   redoStack.value = []
   pendingStructures.value = []
@@ -931,7 +407,6 @@ function resetEditingSessionState() {
   fillDragState.value = null
   shortcutDialogVisible.value = false
   stopFillHandleDrag(false)
-  resetGridViewportState()
   hideContextMenu()
 }
 
@@ -1189,14 +664,14 @@ function applyFormulaBarInput(fillSelection = false) {
     applyForCell(targetCell)
   }
   if (!applied) {
-    ElMessage.warning('未写入任何单元格')
+    ElMessage.warning('娌℃湁鍙簲鐢ㄥ埌閫夊尯鐨勫唴瀹?)
     return
   }
   recomputeSheetFormulaDisplays(sheet)
   recountSheetCellDirtyCount(sheet)
   scheduleDirtyStateRefresh()
   if (invalid > 0) {
-    ElMessage.warning(`有 ${invalid} 个单元格未通过校验，已跳过`)
+    ElMessage.warning(`鏈?${invalid} 涓崟鍏冩牸鍥犱笅鎷夋牎楠屾湭閫氳繃琚烦杩嘸)
   }
 }
 
@@ -1318,7 +793,6 @@ function handleCellFocus(cell) {
 function handleCellBlur() {
   activeEditCellKey.value = ''
   formulaBarFocused.value = false
-  flushFormulaRecompute(false)
 }
 
 function clearSelectedCellValues() {
@@ -1367,7 +841,7 @@ async function copySelection(cut = false) {
     clearSelectedCellValues()
   }
   hideContextMenu()
-  ElMessage.success(cut ? '已剪切并清空原单元格' : '已复制到剪贴板')
+  ElMessage.success(cut ? '宸插壀鍒囧埌鍓创鏉? : '宸插鍒跺埌鍓创鏉?)
 }
 
 async function pasteToSelection() {
@@ -1385,7 +859,7 @@ async function pasteToSelection() {
     }
   }
   if (!matrix.length) {
-    ElMessage.warning('剪贴板没有可粘贴内容')
+    ElMessage.warning('鍓创鏉挎病鏈夊彲绮樿创鍐呭')
     return
   }
   pushUndoSnapshot()
@@ -1415,7 +889,7 @@ async function pasteToSelection() {
     }
   }
   if (!appliedCount) {
-    ElMessage.warning('粘贴失败，目标区域未写入任何单元格')
+    ElMessage.warning('鐩爣鍖哄煙瓒呭嚭褰撳墠琛ㄦ牸鑼冨洿')
     return
   }
   recomputeSheetFormulaDisplays(sheet)
@@ -1424,7 +898,7 @@ async function pasteToSelection() {
   scheduleDirtyStateRefresh()
   hideContextMenu()
   if (invalidCount > 0) {
-    ElMessage.warning(`有 ${invalidCount} 个单元格未通过校验，已跳过`)
+    ElMessage.warning('鏈?' + invalidCount + ' 涓笅鎷夊崟鍏冩牸鍥犻€夐」涓嶅悎娉曡璺宠繃')
   }
 }
 
@@ -1563,18 +1037,18 @@ async function renameCurrentSheet() {
     return
   }
   try {
-    const { value } = await ElMessageBox.prompt('请输入新的工作表名称', '重命名工作表', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    const { value } = await ElMessageBox.prompt('璇疯緭鍏ユ柊鐨勫伐浣滆〃鍚嶇О', '閲嶅懡鍚嶅伐浣滆〃', {
+      confirmButtonText: '纭',
+      cancelButtonText: '鍙栨秷',
       inputValue: sheet.name
     })
     const nextName = normalizeValue(value).trim()
     if (!nextName) {
-      ElMessage.warning('工作表名称不能为空')
+      ElMessage.warning('宸ヤ綔琛ㄥ悕绉颁笉鑳戒负绌?)
       return
     }
     if (sheets.value.some((item) => item.name === nextName && item !== sheet)) {
-      ElMessage.warning('工作表名称已存在')
+      ElMessage.warning('宸ヤ綔琛ㄥ悕绉板凡瀛樺湪')
       return
     }
     if (nextName === sheet.name) {
@@ -1601,7 +1075,7 @@ function copyCurrentSheet() {
   if (!sheet) {
     return
   }
-  const copyName = buildUniqueSheetName(`${sheet.name}_副本`)
+  const copyName = buildUniqueSheetName(`${sheet.name}_鍓湰`)
   pushUndoSnapshot()
   const copy = JSON.parse(JSON.stringify(sheet))
   copy.name = copyName
@@ -1694,7 +1168,6 @@ function createEmptySheet(name) {
     images: [],
     cells: [],
     rows: [],
-    formulaCellCount: 0,
     originalMergeKeys: [],
     originalRowHeights: Array.from({ length: rowCount }, () => DEFAULT_ROW_HEIGHT),
     originalColumnWidths: Array.from({ length: maxColumnCount }, () => DEFAULT_COLUMN_WIDTH)
@@ -1820,7 +1293,7 @@ function insertRowsAt(startIndex, count) {
 function deleteRowsAt(startIndex, count) {
   const sheet = currentSheet.value
   if (!sheet || count <= 0 || sheet.rowCount <= count) {
-    ElMessage.warning('至少需要保留一行，无法删除全部行')
+    ElMessage.warning('鑷冲皯淇濈暀涓€琛屾暟鎹?)
     return
   }
   const deleteStart = clampNumber(startIndex, 0, Math.max(sheet.rowCount - 1, 0))
@@ -1919,7 +1392,7 @@ function insertColumnsAt(startIndex, count) {
 function deleteColumnsAt(startIndex, count) {
   const sheet = currentSheet.value
   if (!sheet || count <= 0 || sheet.maxColumnCount <= count) {
-    ElMessage.warning('至少需要保留一列，无法删除全部列')
+    ElMessage.warning('鑷冲皯淇濈暀涓€鍒楁暟鎹?)
     return
   }
   const deleteStart = clampNumber(startIndex, 0, Math.max(sheet.maxColumnCount - 1, 0))
@@ -2055,12 +1528,12 @@ function toggleFormatPainter() {
   }
   const sourceCell = activePrimaryCell.value
   if (!sourceCell) {
-    ElMessage.warning('请先选中一个源单元格，再启用格式刷')
+    ElMessage.warning('璇峰厛閫夋嫨涓€涓甫鏍煎紡鐨勫崟鍏冩牸')
     return
   }
   formatPainterStyle.value = cloneCellStyle(sourceCell.style)
   formatPainterActive.value = true
-  ElMessage.success('格式刷已就绪，请点击目标区域应用样式')
+  ElMessage.success('鏍煎紡鍒峰凡寮€鍚紝璇风偣鍑荤洰鏍囧崟鍏冩牸')
 }
 
 function applyFormatPainterToRangeIfNeeded(sheet, range) {
@@ -2185,14 +1658,14 @@ function formatSelectionAsDate() {
     appliedCount += 1
   }
   if (!appliedCount) {
-    ElMessage.info('未检测到可转换的日期内容')
+    ElMessage.info('褰撳墠閫夊尯娌℃湁鍙浆鎹负鏃ユ湡鐨勫崟鍏冩牸')
     return
   }
   recomputeSheetFormulaDisplays(sheet)
   recountSheetCellDirtyCount(sheet)
   scheduleDirtyStateRefresh()
   if (skippedCount > 0) {
-    ElMessage.success(`已处理 ${appliedCount} 个单元格，跳过 ${skippedCount} 个单元格`)
+    ElMessage.success(`宸插鐞?${appliedCount} 涓崟鍏冩牸锛岃烦杩?${skippedCount} 涓猔)
   }
 }
 
@@ -2270,14 +1743,14 @@ function applyNumericTransformToSelection(transformer) {
     appliedCount += 1
   }
   if (!appliedCount) {
-    ElMessage.info('未检测到可调整的小数格式')
+    ElMessage.info('褰撳墠閫夊尯娌℃湁鍙鐞嗙殑鏁板瓧鍗曞厓鏍?)
     return
   }
   recomputeSheetFormulaDisplays(sheet)
   recountSheetCellDirtyCount(sheet)
   scheduleDirtyStateRefresh()
   if (skippedCount > 0) {
-    ElMessage.success(`已处理 ${appliedCount} 个单元格，跳过 ${skippedCount} 个单元格`)
+    ElMessage.success(`宸插鐞?${appliedCount} 涓崟鍏冩牸锛岃烦杩?${skippedCount} 涓猔)
   }
 }
 
@@ -2313,7 +1786,7 @@ function detectDecimalPlaces(text) {
 }
 
 function formatNumericByDecimals(valueInfo, decimals) {
-  const safeDecimals = Math.min(Math.max(Number(decimals || 0), 0), MAX_DECIMAL_SCALE)
+  const safeDecimals = Math.min(Math.max(Number(decimals ?? 0), 0), MAX_DECIMAL_SCALE)
   if (valueInfo.isPercent) {
     return `${(valueInfo.value * 100).toFixed(safeDecimals)}%`
   }
@@ -2353,17 +1826,17 @@ function formatDateValue(date) {
 }
 
 function freezeFirstRow() {
-  applyFreezePane(1, Math.max(Number(currentSheet.value?.freezePane?.xSplit || 0), 0))
+  applyFreezePane(1, Math.max(Number(currentSheet.value?.freezePane?.xSplit ?? 0), 0))
 }
 
 function freezeFirstColumn() {
-  applyFreezePane(Math.max(Number(currentSheet.value?.freezePane?.ySplit || 0), 0), 1)
+  applyFreezePane(Math.max(Number(currentSheet.value?.freezePane?.ySplit ?? 0), 0), 1)
 }
 
 function freezeBySelection() {
   const range = activeSelection.value
   if (!range) {
-    ElMessage.warning('请先选择要冻结位置的单元格')
+    ElMessage.warning('璇峰厛閫夋嫨涓€涓崟鍏冩牸浣滀负鍐荤粨鍒嗗壊鐐?)
     return
   }
   applyFreezePane(range.startRow, range.startCol)
@@ -2375,15 +1848,15 @@ function openFreezeDialog() {
     return
   }
   freezeForm.value = {
-    rows: Math.max(Number(sheet.freezePane?.ySplit || 0), 0),
-    cols: Math.max(Number(sheet.freezePane?.xSplit || 0), 0)
+    rows: Math.max(Number(sheet.freezePane?.ySplit ?? 0), 0),
+    cols: Math.max(Number(sheet.freezePane?.xSplit ?? 0), 0)
   }
   freezeDialogVisible.value = true
 }
 
 function applyCustomFreezePane() {
-  const rows = Math.max(Number(freezeForm.value.rows || 0), 0)
-  const cols = Math.max(Number(freezeForm.value.cols || 0), 0)
+  const rows = Math.max(Number(freezeForm.value.rows ?? 0), 0)
+  const cols = Math.max(Number(freezeForm.value.cols ?? 0), 0)
   applyFreezePane(rows, cols)
   freezeDialogVisible.value = false
 }
@@ -2400,8 +1873,8 @@ function applyFreezePane(rows, cols) {
   ensureSheetBounds(sheet, sheet.rowCount, sheet.maxColumnCount)
   const nextRows = clampNumber(rows, 0, Math.max(sheet.rowCount - 1, 0))
   const nextCols = clampNumber(cols, 0, Math.max(sheet.maxColumnCount - 1, 0))
-  const currentRows = Math.max(Number(sheet.freezePane?.ySplit || 0), 0)
-  const currentCols = Math.max(Number(sheet.freezePane?.xSplit || 0), 0)
+  const currentRows = Math.max(Number(sheet.freezePane?.ySplit ?? 0), 0)
+  const currentCols = Math.max(Number(sheet.freezePane?.xSplit ?? 0), 0)
   if (currentRows === nextRows && currentCols === nextCols) {
     return
   }
@@ -2416,40 +1889,27 @@ function applyFreezePane(rows, cols) {
 
 function applyTextColorChange(color) {
   const resolved = resolveColorPickerValue(color, '#111827')
+  textColorPicker.value = resolved.pickerValue
   if (!resolved.valid) {
     return
   }
-  textColorPicker.value = resolved.pickerValue
   applyStyleToSelection({ color: resolved.styleValue })
 }
 
 function applyFillColorChange(color) {
   const resolved = resolveColorPickerValue(color, '#FFFFFF')
+  fillColorPicker.value = resolved.pickerValue
   if (!resolved.valid) {
     return
   }
-  fillColorPicker.value = resolved.pickerValue
   applyStyleToSelection({ backgroundColor: resolved.styleValue })
 }
 
 function resolveColorPickerValue(color, fallbackColor) {
-  let raw = ''
-  if (typeof color === 'string') {
-    raw = color.trim()
-  } else if (typeof color === 'number') {
-    raw = String(color).trim()
-  } else if (color && typeof color === 'object') {
-    if (typeof color.toHexString === 'function') {
-      raw = normalizeValue(color.toHexString()).trim()
-    } else if (typeof color.value === 'string') {
-      raw = color.value.trim()
-    } else if (typeof color.hex === 'string') {
-      raw = color.hex.trim()
-    }
-  }
+  const raw = normalizeValue(color).trim()
   if (!raw) {
     return {
-      valid: false,
+      valid: true,
       pickerValue: fallbackColor,
       styleValue: ''
     }
@@ -2550,7 +2010,7 @@ function sortSelection(direction = 'asc') {
 function openSortDialog() {
   const range = activeSelection.value
   if (!range) {
-    ElMessage.warning('请先选择要排序的区域')
+    ElMessage.warning('璇峰厛閫夋嫨闇€瑕佹帓搴忕殑鍖哄煙')
     return
   }
   sortDialogRange.value = { ...range }
@@ -2629,18 +2089,18 @@ function sortRangeByRules(range, rules, options = {}) {
     return false
   }
   if (sheet.cells.some((cell) => isMergedCell(cell) && rangesIntersect(range, getCellRange(cell)))) {
-    ElMessage.warning('选区内包含合并单元格，暂不支持排序')
+    ElMessage.warning('鍖呭惈鍚堝苟鍗曞厓鏍肩殑鍖哄煙鏆備笉鏀寔鎺掑簭')
     return false
   }
   const hasHeader = options?.hasHeader !== false
   const dataStartRow = hasHeader ? range.startRow + 1 : range.startRow
   if (dataStartRow > range.endRow) {
-    ElMessage.warning('当前选区没有可排序的数据行')
+    ElMessage.warning('璇疯嚦灏戦€夋嫨涓€琛屽彲鎺掑簭鏁版嵁')
     return false
   }
   const normalizedRules = normalizeSortRules(rules, range)
   if (!normalizedRules.length) {
-    ElMessage.warning('请先配置至少一个排序条件')
+    ElMessage.warning('璇疯嚦灏戦厤缃竴鍒楁帓搴忚鍒?)
     return false
   }
   const columnIndexes = []
@@ -2669,7 +2129,7 @@ function sortRangeByRules(range, rules, options = {}) {
   }
 
   if (!sortableRows.length) {
-    ElMessage.warning('当前选区没有可排序的数据')
+    ElMessage.warning('褰撳墠閫夊尯娌℃湁鍙帓搴忔暟鎹?)
     return false
   }
 
@@ -2707,7 +2167,7 @@ function sortRangeByRules(range, rules, options = {}) {
   recountSheetCellDirtyCount(sheet)
   scheduleDirtyStateRefresh()
   if (options?.showMessage) {
-    ElMessage.success('排序已完成')
+    ElMessage.success('鎺掑簭瀹屾垚')
   }
   return true
 }
@@ -2769,13 +2229,13 @@ function toggleAutoFilter() {
   const sheet = currentSheet.value
   const range = activeSelection.value
   if (!sheet || !range) {
-    ElMessage.warning('请先选择要启用筛选的区域')
+    ElMessage.warning('璇峰厛閫夋嫨闇€瑕佺瓫閫夌殑鍖哄煙')
     return
   }
   const hasHeader = sortHasHeader.value !== false
   const dataStartRow = hasHeader ? range.startRow + 1 : range.startRow
   if (dataStartRow > range.endRow) {
-    ElMessage.warning(hasHeader ? '选区仅包含表头，没有可筛选的数据行' : '当前选区没有可筛选的数据行')
+    ElMessage.warning(hasHeader ? '绛涢€夊尯鍩熻嚦灏戦渶瑕佷竴琛岃〃澶村拰涓€琛屾暟鎹? : '鏃犺〃澶存ā寮忎笅鑷冲皯闇€瑕佷竴琛屽彲绛涢€夋暟鎹?)
     return
   }
   const currentFilter = normalizeFilterConfig(sheet.filterConfig)
@@ -2803,7 +2263,7 @@ function toggleAutoFilter() {
   filterDialogColIndex.value = range.startCol
   filterKeyword.value = ''
   filterSelectedValues.value = []
-  ElMessage.success('已开启筛选')
+  ElMessage.success('宸插紑鍚嚜鍔ㄧ瓫閫?)
 }
 
 function clearAutoFilter() {
@@ -2815,7 +2275,7 @@ function clearAutoFilter() {
   columnFilterDialogVisible.value = false
   filterKeyword.value = ''
   filterSelectedValues.value = []
-  ElMessage.success('筛选条件已清除')
+  ElMessage.success('宸叉竻闄ょ瓫閫?)
 }
 
 function isFilterHeaderCell(cell) {
@@ -2840,7 +2300,7 @@ function openColumnFilterDialogBySelection() {
   }
   const filterConfig = normalizeFilterConfig(sheet.filterConfig)
   if (!filterConfig.enabled) {
-    ElMessage.warning('请先启用筛选')
+    ElMessage.warning('璇峰厛寮€鍚瓫閫?)
     return
   }
   const range = activeSelection.value
@@ -2858,11 +2318,11 @@ function openColumnFilterDialog(colIndex) {
   }
   const filterConfig = normalizeFilterConfig(sheet.filterConfig)
   if (!filterConfig.enabled) {
-    ElMessage.warning('请先启用筛选')
+    ElMessage.warning('璇峰厛寮€鍚瓫閫?)
     return
   }
   if (!isColumnInsideFilterRange(colIndex, filterConfig)) {
-    ElMessage.warning('当前列不在筛选范围内')
+    ElMessage.warning('璇烽€夋嫨绛涢€夊尯鍩熷唴鐨勫垪')
     return
   }
   filterDialogColIndex.value = colIndex
@@ -2931,7 +2391,7 @@ function collectFilterCandidateValues(sheet, colIndex) {
     .sort((left, right) => left.localeCompare(right, 'zh-CN', { numeric: true, sensitivity: 'base' }))
     .map((value) => ({
       value,
-      label: value || '(空白)'
+      label: value || '(绌虹櫧)'
     }))
 }
 
@@ -3035,7 +2495,7 @@ function previewFindMatches() {
     ElMessage.warning('请输入查找内容')
     return
   }
-  ElMessage.info(`预计匹配 ${findPreviewCount.value} 项`)
+  ElMessage.info(`预计匹配 ${findPreviewCount.value} 处`)
 }
 
 function findNext() {
@@ -3070,7 +2530,7 @@ function replaceAll() {
   const options = buildFindOptions()
   const matches = collectFindMatches(query, options)
   if (!matches.length) {
-    ElMessage.info('没有找到可替换项')
+    ElMessage.info('未找到可替换项')
     return
   }
   const replacement = normalizeValue(findForm.value.replaceText)
@@ -3101,7 +2561,7 @@ function replaceAll() {
     replacedCount += replaced.count
   }
   if (!replacedCells) {
-    ElMessage.info('没有找到可替换项')
+    ElMessage.info('未找到可替换项')
     return
   }
   for (const sheetName of touchedSheets) {
@@ -3228,7 +2688,7 @@ function escapeRegExp(input) {
 }
 
 function clampNumber(value, min, max) {
-  return Math.min(Math.max(Number(value || min), min), max)
+  return Math.min(Math.max(Number(value ?? min), min), max)
 }
 
 async function acquireEditorLock(fileName) {
@@ -3243,10 +2703,10 @@ async function acquireEditorLock(fileName) {
       return true
     }
     applyLockState(response?.data || {}, fileName)
-    ElMessage.warning(response?.msg || '文件已被其他用户锁定，当前为只读模式')
+    ElMessage.warning(response?.msg || '璇ユ枃浠舵鍦ㄨ鍏朵粬鐢ㄦ埛缂栬緫锛岃绋嶅悗鍐嶈瘯')
     return false
   } catch (error) {
-    ElMessage.error(error?.message || '获取文件锁失败')
+    ElMessage.error(error?.message || '鑾峰彇缂栬緫閿佸け璐?)
     return false
   }
 }
@@ -3330,13 +2790,13 @@ async function heartbeatCurrentLock() {
     applyLockState(response?.data || {}, fileName)
     if (!lockWarningShown.value) {
       lockWarningShown.value = true
-      ElMessage.warning(response?.msg || '文件锁已失效，请重新打开文件')
+      ElMessage.warning(response?.msg || '缂栬緫閿佸凡澶辨晥')
     }
   } catch (error) {
     stopLockHeartbeat()
     if (!lockWarningShown.value) {
       lockWarningShown.value = true
-      ElMessage.warning(error?.message || '文件锁心跳失败')
+      ElMessage.warning(error?.message || '缂栬緫閿佸績璺冲け璐?)
     }
   }
 }
@@ -3356,11 +2816,11 @@ async function releaseLockByFileName(fileName, showError = false) {
   try {
     const response = await releaseExcelEditorLock({ fileName })
     if (response?.code !== 200 && showError) {
-      ElMessage.error(response?.msg || '释放文件锁失败')
+      ElMessage.error(response?.msg || '閲婃斁缂栬緫閿佸け璐?)
     }
   } catch (error) {
     if (showError) {
-      ElMessage.error(error?.message || '释放文件锁失败')
+      ElMessage.error(error?.message || '閲婃斁缂栬緫閿佸け璐?)
     }
   } finally {
     if (lockState.value.fileName === fileName) {
@@ -3397,12 +2857,12 @@ async function loadWorkbookByFileName(fileName, skipConfirm = false, options = {
     const response = await getExcelWorkbookView(normalizedFileName)
     applyWorkbookView(response?.data || {})
     if (notify) {
-      ElMessage.success('已加载工作簿')
+      ElMessage.success('鏂囦欢宸插姞杞?)
     }
   } catch (error) {
     await releaseActiveLock(false)
     if (notify) {
-      ElMessage.error(error?.message || '加载工作簿失败')
+      ElMessage.error(error?.message || '鍔犺浇宸ヤ綔绨垮け璐?)
     }
   } finally {
     loadingServerFile.value = false
@@ -3417,11 +2877,9 @@ function applyWorkbookView(data) {
   activeSheetName.value = nextSheets[0]?.name || ''
   currentFileName.value = data?.currentFileName || data?.fileName || ''
   currentWorkbookVersion.value = data?.version ? String(data.version) : ''
-  workbookName.value = data?.fileName || currentFileName.value || '未命名工作簿'
+  workbookName.value = data?.fileName || currentFileName.value || '鏈姞杞?
   clearSelection()
   refreshDirtyState()
-  scheduleImageRenderForActiveSheet()
-  scheduleGridViewportRefresh()
 }
 
 function normalizeSheet(sheet) {
@@ -3433,12 +2891,12 @@ function normalizeSheet(sheet) {
   const validations = normalizeValidations(sheet?.validations)
   const freezePane = normalizeFreezePane(sheet?.freezePane)
   const filterConfig = normalizeFilterConfig(sheet?.filterConfig)
-  let rowCount = Math.max(Number(sheet?.rowCount || 0), 1)
-  let maxColumnCount = Math.max(Number(sheet?.maxColumnCount || 0), 1)
+  let rowCount = Math.max(Number(sheet?.rowCount ?? 0), 1)
+  let maxColumnCount = Math.max(Number(sheet?.maxColumnCount ?? 0), 1)
   const sourceRows = Array.isArray(sheet?.rows) ? sheet.rows : []
 
   for (const sourceRow of sourceRows) {
-    const rowIndex = Math.max(Number(sourceRow?.rowIndex || 0), 0)
+    const rowIndex = Math.max(Number(sourceRow?.rowIndex ?? 0), 0)
     rowCount = Math.max(rowCount, rowIndex + 1)
     ensureArraySize(rowHeights, rowIndex + 1, DEFAULT_ROW_HEIGHT)
     rowHeights[rowIndex] = normalizeRowHeight(sourceRow?.heightPx)
@@ -3474,7 +2932,6 @@ function normalizeSheet(sheet) {
     images,
     cells: dedupeCells(cells),
     rows: [],
-    formulaCellCount: 0,
     originalMergeKeys: [],
     originalRowHeights: [],
     originalColumnWidths: []
@@ -3493,10 +2950,10 @@ function normalizeCell(cell) {
   const value = cell?.value == null ? '' : String(cell.value)
   const style = cloneCellStyle(cell?.style)
   return {
-    rowIndex: Math.max(Number(cell?.rowIndex || 0), 0),
-    colIndex: Math.max(Number(cell?.colIndex || 0), 0),
-    rowSpan: Math.max(Number(cell?.rowSpan || 1), 1),
-    colSpan: Math.max(Number(cell?.colSpan || 1), 1),
+    rowIndex: Math.max(Number(cell?.rowIndex ?? 0), 0),
+    colIndex: Math.max(Number(cell?.colIndex ?? 0), 0),
+    rowSpan: Math.max(Number(cell?.rowSpan ?? 1), 1),
+    colSpan: Math.max(Number(cell?.colSpan ?? 1), 1),
     widthPx: Math.max(Number(cell?.widthPx ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH),
     heightPx: Math.max(Number(cell?.heightPx ?? DEFAULT_CELL_HEIGHT), MIN_ROW_HEIGHT),
     value,
@@ -3514,10 +2971,10 @@ function normalizeCell(cell) {
 
 function normalizeFreezePane(freezePane) {
   return {
-    xSplit: Math.max(Number(freezePane?.xSplit || 0), 0),
-    ySplit: Math.max(Number(freezePane?.ySplit || 0), 0),
-    leftColumn: Math.max(Number(freezePane?.leftColumn || 0), 0),
-    topRow: Math.max(Number(freezePane?.topRow || 0), 0)
+    xSplit: Math.max(Number(freezePane?.xSplit ?? 0), 0),
+    ySplit: Math.max(Number(freezePane?.ySplit ?? 0), 0),
+    leftColumn: Math.max(Number(freezePane?.leftColumn ?? 0), 0),
+    topRow: Math.max(Number(freezePane?.topRow ?? 0), 0)
   }
 }
 
@@ -3536,13 +2993,13 @@ function normalizeFilterConfig(filterConfig) {
       : []
     criteria[colIndex] = normalizedValues
   }
-  const startCol = Math.max(Number(source.startCol || 0), 0)
-  const endCol = Math.max(Number(source.endCol || startCol), startCol)
-  const headerRow = Math.max(Number(source.headerRow || 0), 0)
+  const startCol = Math.max(Number(source.startCol ?? 0), 0)
+  const endCol = Math.max(Number(source.endCol ?? startCol), startCol)
+  const headerRow = Math.max(Number(source.headerRow ?? 0), 0)
   const minDataStartRow = hasHeader ? headerRow + 1 : headerRow
   const defaultDataStartRow = hasHeader ? headerRow + 1 : headerRow
-  const dataStartRow = Math.max(Number(source.dataStartRow || defaultDataStartRow), minDataStartRow)
-  const dataEndRow = Math.max(Number(source.dataEndRow || dataStartRow), dataStartRow)
+  const dataStartRow = Math.max(Number(source.dataStartRow ?? defaultDataStartRow), minDataStartRow)
+  const dataEndRow = Math.max(Number(source.dataEndRow ?? dataStartRow), dataStartRow)
   return {
     enabled: Boolean(source.enabled),
     hasHeader,
@@ -3559,10 +3016,10 @@ function normalizeValidations(validations) {
   const source = Array.isArray(validations) ? validations : []
   return source
     .map((item) => ({
-      firstRow: Math.max(Number(item?.firstRow || 0), 0),
-      lastRow: Math.max(Number(item?.lastRow || 0), 0),
-      firstColumn: Math.max(Number(item?.firstColumn || 0), 0),
-      lastColumn: Math.max(Number(item?.lastColumn || 0), 0),
+      firstRow: Math.max(Number(item?.firstRow ?? 0), 0),
+      lastRow: Math.max(Number(item?.lastRow ?? 0), 0),
+      firstColumn: Math.max(Number(item?.firstColumn ?? 0), 0),
+      lastColumn: Math.max(Number(item?.lastColumn ?? 0), 0),
       allowBlank: item?.allowBlank !== false,
       options: normalizeValidationOptions(item?.options)
     }))
@@ -3577,8 +3034,8 @@ function normalizeValidationOptions(options) {
     if (!raw) {
       continue
     }
-    if (raw.includes(',') || raw.includes('，') || raw.includes(';') || raw.includes('；') || raw.includes('\n')) {
-      for (const item of raw.split(/[,\n，;；]/)) {
+    if (raw.includes(',') || raw.includes('锛?) || raw.includes(';') || raw.includes('锛?) || raw.includes('\n')) {
+      for (const item of raw.split(/[,\n锛?锛沒/)) {
         const text = normalizeValue(item).trim()
         if (text) {
           flattened.push(text)
@@ -3596,16 +3053,16 @@ function normalizeImages(images) {
   return source
     .map((item) => ({
       kind: item?.kind === 'background' ? 'background' : 'anchored',
-      row1: Math.max(Number(item?.row1 || 0), 0),
-      col1: Math.max(Number(item?.col1 || 0), 0),
-      row2: Math.max(Number(item?.row2 || 0), 0),
-      col2: Math.max(Number(item?.col2 || 0), 0),
-      dx1Px: Math.max(Number(item?.dx1Px || 0), 0),
-      dx2Px: Math.max(Number(item?.dx2Px || 0), 0),
-      dy1Px: Math.max(Number(item?.dy1Px || 0), 0),
-      dy2Px: Math.max(Number(item?.dy2Px || 0), 0),
-      widthPx: Math.max(Number(item?.widthPx || 0), 1),
-      heightPx: Math.max(Number(item?.heightPx || 0), 1),
+      row1: Math.max(Number(item?.row1 ?? 0), 0),
+      col1: Math.max(Number(item?.col1 ?? 0), 0),
+      row2: Math.max(Number(item?.row2 ?? 0), 0),
+      col2: Math.max(Number(item?.col2 ?? 0), 0),
+      dx1Px: Math.max(Number(item?.dx1Px ?? 0), 0),
+      dx2Px: Math.max(Number(item?.dx2Px ?? 0), 0),
+      dy1Px: Math.max(Number(item?.dy1Px ?? 0), 0),
+      dy2Px: Math.max(Number(item?.dy2Px ?? 0), 0),
+      widthPx: Math.max(Number(item?.widthPx ?? 0), 1),
+      heightPx: Math.max(Number(item?.heightPx ?? 0), 1),
       src: item?.src ? String(item.src) : '',
       mimeType: item?.mimeType ? String(item.mimeType) : '',
       extension: item?.extension ? String(item.extension) : '',
@@ -3615,7 +3072,7 @@ function normalizeImages(images) {
 }
 
 function normalizeRowHeight(value) {
-  return Math.max(Number(value || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+  return Math.max(Number(value ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
 }
 
 function applyColumnWidthHint(columnWidths, cell) {
@@ -3636,7 +3093,7 @@ function clearWorkbook() {
   releaseActiveLock(false)
   cancelDirtyStateRefresh()
   resetEditingSessionState()
-  workbookName.value = '未命名工作簿'
+  workbookName.value = '鏈姞杞?
   sheets.value = []
   activeSheetName.value = ''
   currentFileName.value = ''
@@ -3658,7 +3115,7 @@ function handleCellInput(cell) {
   if (normalized.length > MAX_CELL_TEXT_LENGTH) {
     cell.value = normalized.slice(0, MAX_CELL_TEXT_LENGTH)
     if (!showedCellLimitHint.value) {
-      ElMessage.warning('超出 Excel 单元格最大长度 32767，已自动截断')
+      ElMessage.warning('鍗曞厓鏍煎唴瀹硅秴鍑?Excel 闄愬埗锛屽凡鑷姩鎴柇')
       showedCellLimitHint.value = true
     }
   }
@@ -3666,14 +3123,11 @@ function handleCellInput(cell) {
   if (!sheet) {
     return
   }
-  const previousFormula = Boolean(cell.formula)
   const result = applyCellInputValue(sheet, cell, cell.value, { skipValidation: false })
   if (!result.applied) {
     return
   }
-  if (previousFormula || cell.formula || ensureSheetFormulaCount(sheet) > 0) {
-    scheduleFormulaRecompute(sheet)
-  }
+  recomputeSheetFormulaDisplays(sheet)
   scheduleDirtyStateRefresh()
 }
 
@@ -3723,13 +3177,16 @@ function isCellSelected(cell) {
 }
 
 function isFillHandleCell(cell) {
-  if (!cell) {
+  const sheet = currentSheet.value
+  const range = activeSelection.value
+  if (!sheet || !range || !cell || fillDragState.value) {
     return false
   }
-  if (!fillHandleCellKey.value) {
+  const tailCell = findCellByCoordinate(sheet, range.endRow, range.endCol)
+  if (!tailCell) {
     return false
   }
-  return buildCellKey(cell.rowIndex, cell.colIndex) === fillHandleCellKey.value
+  return tailCell.rowIndex === cell.rowIndex && tailCell.colIndex === cell.colIndex
 }
 
 function isCellInFillPreview(cell) {
@@ -4053,11 +3510,11 @@ async function mergeSelectedCells() {
   const sheet = currentSheet.value
   const range = activeSelection.value
   if (!sheet || !range) {
-    ElMessage.warning('请先选择要合并的单元格区域')
+    ElMessage.warning('璇峰厛閫夋嫨闇€瑕佸悎骞剁殑鍗曞厓鏍?)
     return
   }
   if (getSelectionArea(range) < 2) {
-    ElMessage.info('请至少选择 2 个单元格再执行合并')
+    ElMessage.info('鑷冲皯閫夋嫨 2 涓崟鍏冩牸鍚庢墠鑳藉悎骞?)
     return
   }
   pushUndoSnapshot()
@@ -4073,10 +3530,10 @@ async function mergeSelectedCells() {
   })
   if (cellsToClear.length) {
     try {
-      await ElMessageBox.confirm('合并会保留左上角单元格内容，其他内容将被清空，是否继续？', '提示', {
+      await ElMessageBox.confirm('鍚堝苟鍚庝粎淇濈暀宸︿笂瑙掑唴瀹癸紝鑼冨洿鍐呭叾瀹冨唴瀹逛細琚竻绌猴紝鏄惁缁х画锛?, '纭鍚堝苟', {
         type: 'warning',
-        confirmButtonText: '继续',
-        cancelButtonText: '取消'
+        confirmButtonText: '纭鍚堝苟',
+        cancelButtonText: '鍙栨秷'
       })
     } catch {
       return
@@ -4086,7 +3543,7 @@ async function mergeSelectedCells() {
   expandMergedCellsToSingles(sheet, range)
   const topLeftCell = findCellAt(sheet, range.startRow, range.startCol)
   if (!topLeftCell) {
-    ElMessage.warning('选区左上角单元格不存在')
+    ElMessage.warning('閫夊尯鏃犳晥锛屾棤娉曞悎骞?)
     return
   }
 
@@ -4122,14 +3579,14 @@ async function mergeSelectedCells() {
     endCol: range.endCol
   }
   scheduleDirtyStateRefresh()
-  ElMessage.success('合并单元格完成')
+  ElMessage.success('鍚堝苟鍖哄煙宸叉洿鏂帮紝淇濆瓨鍚庡皢鍐欏洖鏂囦欢')
 }
 
 function unmergeSelectedCells() {
   const sheet = currentSheet.value
   const range = activeSelection.value
   if (!sheet || !range) {
-    ElMessage.warning('请先选择要取消合并的区域')
+    ElMessage.warning('璇峰厛閫夋嫨宸插悎骞剁殑鍗曞厓鏍?)
     return
   }
 
@@ -4140,7 +3597,7 @@ function unmergeSelectedCells() {
   )
 
   if (!targetKeys.size) {
-    ElMessage.info('选区内没有可取消的合并单元格')
+    ElMessage.info('褰撳墠閫夊尯鍐呮病鏈夊凡鍚堝苟鍗曞厓鏍?)
     return
   }
   pushUndoSnapshot()
@@ -4160,7 +3617,7 @@ function unmergeSelectedCells() {
   recountSheetCellDirtyCount(sheet)
   recountSheetMergeDirtyCount(sheet)
   scheduleDirtyStateRefresh()
-  ElMessage.success('取消合并完成')
+  ElMessage.success('宸插彇娑堝悎骞讹紝淇濆瓨鍚庡皢鍐欏洖鏂囦欢')
 }
 
 function expandMergedCellsToSingles(sheet, range) {
@@ -4239,14 +3696,6 @@ function findCellByCoordinate(sheet, rowIndex, colIndex) {
   if (!sheet) {
     return null
   }
-  const rowCells = Array.isArray(sheet.rows?.[rowIndex]?.cells) ? sheet.rows[rowIndex].cells : null
-  if (rowCells?.length) {
-    for (const cell of rowCells) {
-      if (colIndex >= cell.colIndex && colIndex < cell.colIndex + cell.colSpan) {
-        return cell
-      }
-    }
-  }
   for (const cell of sheet.cells) {
     if (rowIndex < cell.rowIndex || rowIndex >= cell.rowIndex + cell.rowSpan) {
       continue
@@ -4288,7 +3737,6 @@ function applyCellInputValue(sheet, cell, inputValue, options = {}) {
   if (!sheet || !cell) {
     return { applied: false, reason: 'missing-cell' }
   }
-  const previousFormulaMode = Boolean(cell.formula)
   let nextValue = normalizeValue(inputValue)
   if (nextValue.length > MAX_CELL_TEXT_LENGTH) {
     nextValue = nextValue.slice(0, MAX_CELL_TEXT_LENGTH)
@@ -4300,7 +3748,6 @@ function applyCellInputValue(sheet, cell, inputValue, options = {}) {
   nextValue = validation.value
   const formulaMode = isFormulaValue(nextValue)
   cell.formula = formulaMode
-  updateSheetFormulaCount(sheet, previousFormulaMode, formulaMode)
   applyCellDirtyChange(sheet, cell, nextValue)
   if (formulaMode) {
     cell.displayValue = normalizeValue(evaluateFormulaCell(sheet, cell, new Set()))
@@ -4314,18 +3761,15 @@ function recomputeSheetFormulaDisplays(sheet) {
   if (!sheet) {
     return
   }
-  let formulaCount = 0
   for (const cell of sheet.cells) {
     if (isFormulaValue(cell.value)) {
       cell.formula = true
       cell.displayValue = normalizeValue(evaluateFormulaCell(sheet, cell, new Set()))
-      formulaCount += 1
       continue
     }
     cell.formula = false
     cell.displayValue = normalizeValue(cell.value)
   }
-  sheet.formulaCellCount = formulaCount
 }
 
 function evaluateFormulaCell(sheet, cell, trail = new Set()) {
@@ -4356,8 +3800,8 @@ function evaluateFormulaCell(sheet, cell, trail = new Set()) {
 
 function evaluateFormulaExpression(sheet, cell, expression, trail) {
   let expr = normalizeValue(expression).toUpperCase()
-  expr = expr.replace(/\bROW\(\)/g, String(Math.max(Number(cell?.rowIndex || 0) + 1, 1)))
-  expr = expr.replace(/\bCOLUMN\(\)/g, String(Math.max(Number(cell?.colIndex || 0) + 1, 1)))
+  expr = expr.replace(/\bROW\(\)/g, String(Math.max(Number(cell?.rowIndex ?? 0) + 1, 1)))
+  expr = expr.replace(/\bCOLUMN\(\)/g, String(Math.max(Number(cell?.colIndex ?? 0) + 1, 1)))
   expr = replaceFormulaFunction(expr, 'SUM', (argsText) => {
     const values = resolveFormulaArgsValues(argsText, sheet, trail)
     return values.reduce((acc, value) => acc + value, 0)
@@ -4515,59 +3959,6 @@ function isCellTopLeftInsideRange(cell, range) {
     && cell.colIndex <= range.endCol
 }
 
-function cancelFormulaRecompute() {
-  if (formulaRecomputeTimer.value) {
-    clearTimeout(formulaRecomputeTimer.value)
-    formulaRecomputeTimer.value = 0
-  }
-  formulaRecomputeSheetName.value = ''
-}
-
-function scheduleFormulaRecompute(sheet, options = {}) {
-  if (!sheet) {
-    return
-  }
-  const immediate = Boolean(options?.immediate)
-  const force = Boolean(options?.force)
-  const hasFormulas = ensureSheetFormulaCount(sheet) > 0
-  if (!force && !hasFormulas) {
-    return
-  }
-  formulaRecomputeSheetName.value = sheet.name
-  if (immediate) {
-    flushFormulaRecompute(true)
-    return
-  }
-  if (formulaRecomputeTimer.value) {
-    return
-  }
-  formulaRecomputeTimer.value = window.setTimeout(() => {
-    formulaRecomputeTimer.value = 0
-    flushFormulaRecompute(false)
-  }, FORMULA_RECOMPUTE_DELAY)
-}
-
-function flushFormulaRecompute(force = false) {
-  if (formulaRecomputeTimer.value) {
-    clearTimeout(formulaRecomputeTimer.value)
-    formulaRecomputeTimer.value = 0
-  }
-  const sheetName = formulaRecomputeSheetName.value
-  formulaRecomputeSheetName.value = ''
-  if (!sheetName) {
-    return
-  }
-  const sheet = sheets.value.find((item) => item.name === sheetName)
-  if (!sheet) {
-    return
-  }
-  if (!force && ensureSheetFormulaCount(sheet) <= 0) {
-    return
-  }
-  recomputeSheetFormulaDisplays(sheet)
-  scheduleDirtyStateRefresh()
-}
-
 function scheduleDirtyStateRefresh() {
   if (dirtyRefreshRafId.value) {
     return
@@ -4600,46 +3991,10 @@ function refreshDirtyState() {
   isDirty.value = totalChanges > 0
 }
 
-function ensureSheetFormulaCount(sheet) {
-  if (!sheet) {
-    return 0
-  }
-  const count = Number(sheet.formulaCellCount)
-  if (Number.isFinite(count) && count >= 0) {
-    return count
-  }
-  return recountSheetFormulaCellCount(sheet)
-}
-
-function recountSheetFormulaCellCount(sheet) {
-  if (!sheet) {
-    return 0
-  }
-  let count = 0
-  for (const cell of sheet.cells) {
-    if (cell.formula || isFormulaValue(cell.value)) {
-      count += 1
-    }
-  }
-  sheet.formulaCellCount = count
-  return count
-}
-
-function updateSheetFormulaCount(sheet, previousFormulaMode, nextFormulaMode) {
-  const previous = previousFormulaMode ? 1 : 0
-  const next = nextFormulaMode ? 1 : 0
-  if (previous === next) {
-    return
-  }
-  const current = ensureSheetFormulaCount(sheet)
-  sheet.formulaCellCount = Math.max(current + next - previous, 0)
-}
-
 function ensureSheetDirtyMetrics(sheet) {
   if (!sheet) {
     return
   }
-  ensureSheetFormulaCount(sheet)
   if (typeof sheet.cellDirtyCount !== 'number') {
     sheet.cellDirtyCount = countSheetDirtyCells(sheet)
   }
@@ -4658,7 +4013,6 @@ function initializeSheetDirtyMetrics(sheet) {
   if (!sheet) {
     return
   }
-  recountSheetFormulaCellCount(sheet)
   sheet.cellDirtyCount = countSheetDirtyCells(sheet)
   sheet.mergeDirtyCount = calculateSheetMergeDirtyCount(sheet)
   sheet.rowDirtyIndexes = buildDimensionDirtySet(sheet.rowHeights, sheet.originalRowHeights, DEFAULT_ROW_HEIGHT)
@@ -4712,8 +4066,8 @@ function buildDimensionDirtySet(currentValues, originalValues, fallbackValue) {
   const original = Array.isArray(originalValues) ? originalValues : []
   const length = Math.max(current.length, original.length)
   for (let index = 0; index < length; index += 1) {
-    const currentValue = Math.round(Number(current[index] || fallbackValue))
-    const originalValue = Math.round(Number(original[index] || fallbackValue))
+    const currentValue = Math.round(Number(current[index] ?? fallbackValue))
+    const originalValue = Math.round(Number(original[index] ?? fallbackValue))
     if (currentValue !== originalValue) {
       dirtySet.add(index)
     }
@@ -4723,8 +4077,8 @@ function buildDimensionDirtySet(currentValues, originalValues, fallbackValue) {
 
 function updateRowDirtyMarker(sheet, rowIndex) {
   ensureSheetDirtyMetrics(sheet)
-  const currentValue = Math.round(Number(sheet.rowHeights[rowIndex] || DEFAULT_ROW_HEIGHT))
-  const originalValue = Math.round(Number(sheet.originalRowHeights?.[rowIndex] || DEFAULT_ROW_HEIGHT))
+  const currentValue = Math.round(Number(sheet.rowHeights[rowIndex] ?? DEFAULT_ROW_HEIGHT))
+  const originalValue = Math.round(Number(sheet.originalRowHeights?.[rowIndex] ?? DEFAULT_ROW_HEIGHT))
   if (currentValue !== originalValue) {
     sheet.rowDirtyIndexes.add(rowIndex)
   } else {
@@ -4734,8 +4088,8 @@ function updateRowDirtyMarker(sheet, rowIndex) {
 
 function updateColumnDirtyMarker(sheet, colIndex) {
   ensureSheetDirtyMetrics(sheet)
-  const currentValue = Math.round(Number(sheet.columnWidths[colIndex] || DEFAULT_COLUMN_WIDTH))
-  const originalValue = Math.round(Number(sheet.originalColumnWidths?.[colIndex] || DEFAULT_COLUMN_WIDTH))
+  const currentValue = Math.round(Number(sheet.columnWidths[colIndex] ?? DEFAULT_COLUMN_WIDTH))
+  const originalValue = Math.round(Number(sheet.originalColumnWidths?.[colIndex] ?? DEFAULT_COLUMN_WIDTH))
   if (currentValue !== originalValue) {
     sheet.columnDirtyIndexes.add(colIndex)
   } else {
@@ -4811,8 +4165,8 @@ function collectRowHeightChanges() {
   for (const sheet of sheets.value) {
     const rowLength = Math.max(sheet.rowHeights.length, (sheet.originalRowHeights || []).length)
     for (let index = 0; index < rowLength; index += 1) {
-      const current = Math.round(Number(sheet.rowHeights[index] || DEFAULT_ROW_HEIGHT))
-      const original = Math.round(Number(sheet.originalRowHeights?.[index] || DEFAULT_ROW_HEIGHT))
+      const current = Math.round(Number(sheet.rowHeights[index] ?? DEFAULT_ROW_HEIGHT))
+      const original = Math.round(Number(sheet.originalRowHeights?.[index] ?? DEFAULT_ROW_HEIGHT))
       if (current !== original) {
         changes.push({
           sheetName: sheet.name,
@@ -4830,8 +4184,8 @@ function collectColumnWidthChanges() {
   for (const sheet of sheets.value) {
     const columnLength = Math.max(sheet.columnWidths.length, (sheet.originalColumnWidths || []).length)
     for (let index = 0; index < columnLength; index += 1) {
-      const current = Math.round(Number(sheet.columnWidths[index] || DEFAULT_COLUMN_WIDTH))
-      const original = Math.round(Number(sheet.originalColumnWidths?.[index] || DEFAULT_COLUMN_WIDTH))
+      const current = Math.round(Number(sheet.columnWidths[index] ?? DEFAULT_COLUMN_WIDTH))
+      const original = Math.round(Number(sheet.originalColumnWidths?.[index] ?? DEFAULT_COLUMN_WIDTH))
       if (current !== original) {
         changes.push({
           sheetName: sheet.name,
@@ -4858,8 +4212,8 @@ function markWorkbookSaved(serverData = {}) {
       cell.forceDirty = false
     }
     sheet.originalMergeKeys = collectSheetMergeKeys(sheet)
-    sheet.originalRowHeights = sheet.rowHeights.map((height) => Math.round(Number(height || DEFAULT_ROW_HEIGHT)))
-    sheet.originalColumnWidths = sheet.columnWidths.map((width) => Math.round(Number(width || DEFAULT_COLUMN_WIDTH)))
+    sheet.originalRowHeights = sheet.rowHeights.map((height) => Math.round(Number(height ?? DEFAULT_ROW_HEIGHT)))
+    sheet.originalColumnWidths = sheet.columnWidths.map((width) => Math.round(Number(width ?? DEFAULT_COLUMN_WIDTH)))
     initializeSheetDirtyMetrics(sheet)
   }
 
@@ -4871,13 +4225,13 @@ async function saveToServer(options = {}) {
   const commitLocal = Boolean(options?.commitLocal)
   if (!currentFileName.value || !hasWorkbook.value) {
     if (!silent) {
-      ElMessage.warning('请先打开 Excel 文件后再保存')
+      ElMessage.warning('璇峰厛鍔犺浇 Excel 鏂囦欢')
     }
     return
   }
   if (!currentWorkbookVersion.value) {
     if (!silent) {
-      ElMessage.warning('当前版本号缺失，正在重新加载最新文件')
+      ElMessage.warning('褰撳墠鏂囦欢鐗堟湰淇℃伅缂哄け锛岃鍏堥噸鏂板姞杞藉悗鍐嶄繚瀛?)
     }
     await loadWorkbookByFileName(currentFileName.value, true, { notify: !silent })
     return
@@ -4897,7 +4251,7 @@ async function saveToServer(options = {}) {
   const structures = pendingStructures.value.slice()
   if (!changes.length && !mergeChanges && !rowHeightChanges.length && !columnWidthChanges.length && !structures.length) {
     if (!silent) {
-      ElMessage.info('当前没有变更，无需保存')
+      ElMessage.info('褰撳墠娌℃湁闇€瑕佷繚瀛樼殑淇敼')
     }
     return
   }
@@ -4917,13 +4271,13 @@ async function saveToServer(options = {}) {
       if (response?.data?.versionConflict) {
         const nextFileName = response?.data?.currentFileName || currentFileName.value
         if (!silent) {
-          ElMessage.warning(response?.msg || '版本冲突，已自动加载最新版本')
+          ElMessage.warning(response?.msg || '鏂囦欢宸插湪鏈嶅姟鍣ㄦ洿鏂帮紝璇烽噸鏂板姞杞藉悗鍐嶄繚瀛?)
         }
         await loadWorkbookByFileName(nextFileName, true, { notify: !silent })
         return
       }
       if (!silent) {
-        ElMessage.error(response?.msg || '保存失败')
+        ElMessage.error(response?.msg || '淇濆瓨宸ヤ綔绨垮け璐?)
       }
       return
     }
@@ -4934,11 +4288,11 @@ async function saveToServer(options = {}) {
       await loadWorkbookByFileName(nextFileName, true, { notify: !silent })
     }
     if (!silent) {
-      ElMessage.success(response?.msg || 'Excel 保存成功')
+      ElMessage.success(response?.msg || 'Excel 淇濆瓨鎴愬姛')
     }
   } catch (error) {
     if (!silent) {
-      ElMessage.error(error?.message || '保存失败')
+      ElMessage.error(error?.message || '淇濆瓨宸ヤ綔绨垮け璐?)
     }
   } finally {
     saving.value = false
@@ -4947,7 +4301,7 @@ async function saveToServer(options = {}) {
 
 async function reloadWorkbook() {
   if (!currentFileName.value) {
-    ElMessage.warning('当前没有可刷新的文件')
+    ElMessage.warning('褰撳墠鏈€夋嫨鏂囦欢')
     return
   }
   await loadWorkbookByFileName(currentFileName.value)
@@ -4955,53 +4309,35 @@ async function reloadWorkbook() {
 
 async function downloadServerWorkbook() {
   if (!currentFileName.value) {
-    ElMessage.warning('当前没有可下载的文件')
+    ElMessage.warning('褰撳墠娌℃湁鍙笅杞芥枃浠?)
     return
   }
   try {
     const buffer = await getExcelEditorContent(currentFileName.value)
     saveAs(new Blob([buffer]), currentFileName.value)
-    ElMessage.success('下载成功')
+    ElMessage.success('鏂囦欢涓嬭浇鎴愬姛')
   } catch (error) {
-    ElMessage.error(error?.message || '下载失败')
+    ElMessage.error(error?.message || '涓嬭浇澶辫触')
   }
 }
 
 function hasBackgroundImages(sheet) {
-  return listBackgroundImages(sheet).length > 0
+  return sheetHasBackgroundImage(sheet)
 }
 
 function hasAnchoredImages(sheet) {
-  return listAnchoredImages(sheet).length > 0
+  const images = Array.isArray(sheet?.images) ? sheet.images : []
+  return images.some((image) => image.kind === 'anchored')
 }
 
 function listBackgroundImages(sheet) {
-  return listRenderableImages(sheet, 'background')
+  const images = Array.isArray(sheet?.images) ? sheet.images : []
+  return images.filter((image) => image.kind === 'background')
 }
 
 function listAnchoredImages(sheet) {
-  return listRenderableImages(sheet, 'anchored')
-}
-
-function listRenderableImages(sheet, kind) {
   const images = Array.isArray(sheet?.images) ? sheet.images : []
-  if (!images.length || !isImageRenderReadyForSheet(sheet)) {
-    return []
-  }
-  const scoped = images.filter((image) => image.kind === kind)
-  if (kind !== 'anchored' || scoped.length <= 8) {
-    return scoped
-  }
-  const viewport = getGridViewportRect()
-  if (!viewport) {
-    return scoped
-  }
-  return scoped.filter((image) => {
-    if (isFrozenAnchoredImage(sheet, image)) {
-      return true
-    }
-    return isImageInViewport(sheet, image, viewport)
-  })
+  return images.filter((image) => image.kind === 'anchored')
 }
 
 function sheetHasBackgroundImage(sheet) {
@@ -5021,165 +4357,36 @@ function buildSheetStageStyle(sheet) {
   }
 }
 
-function handleGridScroll() {
-  scheduleGridViewportRefresh()
-}
-
-function scheduleGridViewportRefresh() {
-  if (gridViewportRafId.value) {
-    return
-  }
-  gridViewportRafId.value = requestAnimationFrame(() => {
-    gridViewportRafId.value = 0
-    refreshGridViewport()
-  })
-}
-
-function cancelGridViewportRefresh() {
-  if (!gridViewportRafId.value) {
-    return
-  }
-  cancelAnimationFrame(gridViewportRafId.value)
-  gridViewportRafId.value = 0
-}
-
-function refreshGridViewport() {
-  const wrap = gridWrapRef.value
-  if (!wrap) {
-    return
-  }
-  gridViewportState.value = {
-    top: Math.max(Number(wrap.scrollTop || 0), 0),
-    left: Math.max(Number(wrap.scrollLeft || 0), 0),
-    width: Math.max(Number(wrap.clientWidth || 0), 0),
-    height: Math.max(Number(wrap.clientHeight || 0), 0)
-  }
-}
-
-function resetGridViewportState() {
-  gridViewportState.value = {
-    top: 0,
-    left: 0,
-    width: 0,
-    height: 0
-  }
-}
-
-function cancelImageRenderDelay() {
-  if (!imageRenderDelayTimer.value) {
-    return
-  }
-  clearTimeout(imageRenderDelayTimer.value)
-  imageRenderDelayTimer.value = 0
-}
-
-function scheduleImageRenderForActiveSheet() {
-  cancelImageRenderDelay()
-  const sheetName = normalizeValue(activeSheetName.value)
-  imageRenderSheetName.value = sheetName
-  imageRenderReady.value = false
-  if (!sheetName) {
-    return
-  }
-  scheduleGridViewportRefresh()
-  imageRenderDelayTimer.value = window.setTimeout(() => {
-    imageRenderDelayTimer.value = 0
-    if (normalizeValue(activeSheetName.value) !== sheetName) {
-      return
-    }
-    refreshGridViewport()
-    imageRenderReady.value = true
-  }, IMAGE_RENDER_DELAY)
-}
-
-function isImageRenderReadyForSheet(sheet) {
-  if (!sheet) {
-    return false
-  }
-  return imageRenderReady.value && imageRenderSheetName.value === sheet.name
-}
-
-function getGridViewportRect() {
-  const state = gridViewportState.value || {}
-  if (!state.width || !state.height) {
-    return null
-  }
-  return {
-    top: Math.max(Number(state.top || 0) - IMAGE_VIEWPORT_OVERSCAN, 0),
-    left: Math.max(Number(state.left || 0) - IMAGE_VIEWPORT_OVERSCAN, 0),
-    bottom: Math.max(Number(state.top || 0) + Number(state.height || 0) + IMAGE_VIEWPORT_OVERSCAN, 0),
-    right: Math.max(Number(state.left || 0) + Number(state.width || 0) + IMAGE_VIEWPORT_OVERSCAN, 0)
-  }
-}
-
-function isFrozenAnchoredImage(sheet, image) {
-  if (!sheet || !image || image.kind === 'background') {
-    return false
-  }
-  const freezePane = sheet.freezePane || { xSplit: 0, ySplit: 0 }
-  const freezeRows = Math.max(Number(freezePane.ySplit || 0), 0)
-  const freezeColumns = Math.max(Number(freezePane.xSplit || 0), 0)
-  return image.row1 < freezeRows || image.col1 < freezeColumns
-}
-
-function isImageInViewport(sheet, image, viewport) {
-  const layout = resolveImageLayout(sheet, image)
-  if (!layout) {
-    return false
-  }
-  return layout.bottom >= viewport.top
-    && layout.top <= viewport.bottom
-    && layout.right >= viewport.left
-    && layout.left <= viewport.right
-}
-
-function resolveImageLayout(sheet, image) {
-  if (!sheet || !image) {
-    return null
-  }
-  const dx = Math.max(Number(image?.dx1Px || 0), 0)
-  const dy = Math.max(Number(image?.dy1Px || 0), 0)
-  const width = Math.max(Number(image?.widthPx || 0), 1)
-  const height = Math.max(Number(image?.heightPx || 0), 1)
-  const top = COLUMN_HEADER_HEIGHT + resolveFrozenTopOffset(sheet, image.row1) + dy
-  const left = ROW_INDEX_WIDTH + resolveFrozenLeftOffset(sheet, image.col1) + dx
-  return {
-    top,
-    left,
-    width,
-    height,
-    right: left + width,
-    bottom: top + height
-  }
-}
-
 function buildImageStyle(image) {
   const sheet = currentSheet.value
   if (!sheet) {
     return {}
   }
 
-  const layout = resolveImageLayout(sheet, image)
-  if (!layout) {
-    return {}
-  }
+  const dx = Math.max(Number(image?.dx1Px ?? 0), 0)
+  const dy = Math.max(Number(image?.dy1Px ?? 0), 0)
+  const top = COLUMN_HEADER_HEIGHT + resolveFrozenTopOffset(sheet, image.row1) + dy
+  const left = ROW_INDEX_WIDTH + resolveFrozenLeftOffset(sheet, image.col1) + dx
 
   const style = {
-    top: `${layout.top}px`,
-    left: `${layout.left}px`,
-    width: `${layout.width}px`,
-    height: `${layout.height}px`
+    top: `${top}px`,
+    left: `${left}px`,
+    width: `${Math.max(Number(image?.widthPx ?? 0), 1)}px`,
+    height: `${Math.max(Number(image?.heightPx ?? 0), 1)}px`
   }
 
-  const inFrozenRow = isFrozenAnchoredImage(sheet, image) && image.row1 < Math.max(Number(sheet.freezePane?.ySplit || 0), 0)
-  const inFrozenColumn = isFrozenAnchoredImage(sheet, image) && image.col1 < Math.max(Number(sheet.freezePane?.xSplit || 0), 0)
+  const freezePane = sheet.freezePane || { xSplit: 0, ySplit: 0 }
+  const freezeRows = Math.max(Number(freezePane.ySplit ?? 0), 0)
+  const freezeColumns = Math.max(Number(freezePane.xSplit ?? 0), 0)
+  const inFrozenRow = image.kind !== 'background' && image.row1 < freezeRows
+  const inFrozenColumn = image.kind !== 'background' && image.col1 < freezeColumns
   if (inFrozenRow || inFrozenColumn) {
     style.position = 'sticky'
     if (inFrozenRow) {
-      style.top = `${layout.top}px`
+      style.top = `${top}px`
     }
     if (inFrozenColumn) {
-      style.left = `${layout.left}px`
+      style.left = `${left}px`
     }
     style.zIndex = inFrozenRow && inFrozenColumn ? 8 : 7
   }
@@ -5207,8 +4414,8 @@ function buildCellTdStyle(cell) {
   }
 
   const freezePane = sheet.freezePane || { xSplit: 0, ySplit: 0 }
-  const freezeRows = Math.max(Number(freezePane.ySplit || 0), 0)
-  const freezeColumns = Math.max(Number(freezePane.xSplit || 0), 0)
+  const freezeRows = Math.max(Number(freezePane.ySplit ?? 0), 0)
+  const freezeColumns = Math.max(Number(freezePane.xSplit ?? 0), 0)
   const inFrozenRow = cell.rowIndex < freezeRows
   const inFrozenColumn = cell.colIndex < freezeColumns
   const atFreezeBottomEdge = freezeRows > 0 && cell.rowIndex + cell.rowSpan - 1 === freezeRows - 1
@@ -5252,7 +4459,7 @@ function buildRowIndexStyle(row) {
   if (!sheet) {
     return style
   }
-  const freezeRows = Math.max(Number(sheet.freezePane?.ySplit || 0), 0)
+  const freezeRows = Math.max(Number(sheet.freezePane?.ySplit ?? 0), 0)
   if (row.rowIndex < freezeRows) {
     style.top = `${COLUMN_HEADER_HEIGHT + resolveFrozenTopOffset(sheet, row.rowIndex)}px`
     style.zIndex = 7
@@ -5264,13 +4471,13 @@ function buildRowIndexStyle(row) {
 }
 
 function buildColumnHeaderStyle(sheet, columnIndex) {
-  const width = Math.max(Number(sheet?.columnWidths?.[columnIndex] || DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+  const width = Math.max(Number(sheet?.columnWidths?.[columnIndex] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
   const style = {
     width: `${width}px`,
     minWidth: `${width}px`,
     height: `${COLUMN_HEADER_HEIGHT}px`
   }
-  const freezeColumns = Math.max(Number(sheet?.freezePane?.xSplit || 0), 0)
+  const freezeColumns = Math.max(Number(sheet?.freezePane?.xSplit ?? 0), 0)
   if (columnIndex < freezeColumns) {
     style.left = `${ROW_INDEX_WIDTH + resolveFrozenLeftOffset(sheet, columnIndex)}px`
     style.zIndex = 10
@@ -5299,7 +4506,7 @@ function buildCellInputStyle(cell) {
 function resolveFrozenTopOffset(sheet, rowIndex) {
   let total = 0
   for (let index = 0; index < rowIndex; index += 1) {
-    total += Math.max(Number(sheet.rowHeights[index] || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+    total += Math.max(Number(sheet.rowHeights[index] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
   }
   return total
 }
@@ -5307,7 +4514,7 @@ function resolveFrozenTopOffset(sheet, rowIndex) {
 function resolveFrozenLeftOffset(sheet, columnIndex) {
   let total = 0
   for (let index = 0; index < columnIndex; index += 1) {
-    total += Math.max(Number(sheet.columnWidths[index] || DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+    total += Math.max(Number(sheet.columnWidths[index] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
   }
   return total
 }
@@ -5317,9 +4524,9 @@ function resolveSheetPixelWidth(sheet) {
     return ROW_INDEX_WIDTH + DEFAULT_COLUMN_WIDTH
   }
   let total = ROW_INDEX_WIDTH
-  const maxColumnCount = Math.max(Number(sheet.maxColumnCount || 0), 1)
+  const maxColumnCount = Math.max(Number(sheet.maxColumnCount ?? 0), 1)
   for (let index = 0; index < maxColumnCount; index += 1) {
-    total += Math.max(Number(sheet.columnWidths[index] || DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+    total += Math.max(Number(sheet.columnWidths[index] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
   }
   return total
 }
@@ -5329,9 +4536,9 @@ function resolveSheetPixelHeight(sheet) {
     return COLUMN_HEADER_HEIGHT + DEFAULT_ROW_HEIGHT
   }
   let total = COLUMN_HEADER_HEIGHT
-  const rowCount = Math.max(Number(sheet.rowCount || 0), 1)
+  const rowCount = Math.max(Number(sheet.rowCount ?? 0), 1)
   for (let index = 0; index < rowCount; index += 1) {
-    total += Math.max(Number(sheet.rowHeights[index] || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+    total += Math.max(Number(sheet.rowHeights[index] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
   }
   return total
 }
@@ -5359,7 +4566,7 @@ function startColumnResize(colIndex, event) {
     sheetName: sheet.name,
     colIndex,
     startX: Number(event.clientX || 0),
-    startWidth: Math.max(Number(sheet.columnWidths[colIndex] || DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+    startWidth: Math.max(Number(sheet.columnWidths[colIndex] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
   }
   rowResizeState.value = null
   document.body.style.cursor = 'col-resize'
@@ -5380,7 +4587,7 @@ function startRowResize(rowIndex, event) {
     sheetName: sheet.name,
     rowIndex,
     startY: Number(event.clientY || 0),
-    startHeight: Math.max(Number(sheet.rowHeights[rowIndex] || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+    startHeight: Math.max(Number(sheet.rowHeights[rowIndex] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
   }
   columnResizeState.value = null
   document.body.style.cursor = 'row-resize'
@@ -5445,7 +4652,7 @@ function updateCellsForRowResize(sheet, rowIndex) {
 function resolveRangeWidthFast(sheet, startColumnIndex, colSpan) {
   let total = 0
   for (let offset = 0; offset < colSpan; offset += 1) {
-    total += Math.max(Number(sheet.columnWidths[startColumnIndex + offset] || DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+    total += Math.max(Number(sheet.columnWidths[startColumnIndex + offset] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
   }
   return total
 }
@@ -5453,7 +4660,7 @@ function resolveRangeWidthFast(sheet, startColumnIndex, colSpan) {
 function resolveRangeHeightFast(sheet, startRowIndex, rowSpan) {
   let total = 0
   for (let offset = 0; offset < rowSpan; offset += 1) {
-    total += Math.max(Number(sheet.rowHeights[startRowIndex + offset] || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+    total += Math.max(Number(sheet.rowHeights[startRowIndex + offset] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
   }
   return total
 }
@@ -5687,7 +4894,7 @@ function formatSelectionRange(range) {
 
 function toColumnLabel(columnIndex) {
   let label = ''
-  let current = Math.max(Number(columnIndex || 0), 0) + 1
+  let current = Math.max(Number(columnIndex ?? 0), 0) + 1
   while (current > 0) {
     const remainder = (current - 1) % 26
     label = String.fromCharCode(65 + remainder) + label
@@ -5710,15 +4917,15 @@ function ensureSheetBounds(sheet, requiredRowCount, requiredColumnCount) {
   if (!sheet.freezePane) {
     sheet.freezePane = normalizeFreezePane(null)
   }
-  sheet.freezePane.xSplit = Math.min(Math.max(Number(sheet.freezePane.xSplit || 0), 0), sheet.maxColumnCount)
-  sheet.freezePane.ySplit = Math.min(Math.max(Number(sheet.freezePane.ySplit || 0), 0), sheet.rowCount)
+  sheet.freezePane.xSplit = Math.min(Math.max(Number(sheet.freezePane.xSplit ?? 0), 0), sheet.maxColumnCount)
+  sheet.freezePane.ySplit = Math.min(Math.max(Number(sheet.freezePane.ySplit ?? 0), 0), sheet.rowCount)
 }
 
 function resolveRangeWidth(sheet, startColumnIndex, colSpan) {
   ensureSheetBounds(sheet, sheet.rowCount, startColumnIndex + colSpan)
   let total = 0
   for (let offset = 0; offset < colSpan; offset += 1) {
-    total += Math.max(Number(sheet.columnWidths[startColumnIndex + offset] || DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
+    total += Math.max(Number(sheet.columnWidths[startColumnIndex + offset] ?? DEFAULT_COLUMN_WIDTH), MIN_COLUMN_WIDTH)
   }
   return total
 }
@@ -5727,7 +4934,7 @@ function resolveRangeHeight(sheet, startRowIndex, rowSpan) {
   ensureSheetBounds(sheet, startRowIndex + rowSpan, sheet.maxColumnCount)
   let total = 0
   for (let offset = 0; offset < rowSpan; offset += 1) {
-    total += Math.max(Number(sheet.rowHeights[startRowIndex + offset] || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
+    total += Math.max(Number(sheet.rowHeights[startRowIndex + offset] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT)
   }
   return total
 }
@@ -5782,8 +4989,8 @@ function dedupeCells(cells) {
 }
 
 function rebuildSheetRows(sheet) {
-  let rowCount = Math.max(Number(sheet.rowCount || 0), 1)
-  let maxColumnCount = Math.max(Number(sheet.maxColumnCount || 0), 1)
+  let rowCount = Math.max(Number(sheet.rowCount ?? 0), 1)
+  let maxColumnCount = Math.max(Number(sheet.maxColumnCount ?? 0), 1)
 
   for (const cell of sheet.cells) {
     rowCount = Math.max(rowCount, cell.rowIndex + cell.rowSpan)
@@ -5795,7 +5002,7 @@ function rebuildSheetRows(sheet) {
 
   const rows = Array.from({ length: sheet.rowCount }, (_, rowIndex) => ({
     rowIndex,
-    heightPx: Math.max(Number(sheet.rowHeights[rowIndex] || DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT),
+    heightPx: Math.max(Number(sheet.rowHeights[rowIndex] ?? DEFAULT_ROW_HEIGHT), MIN_ROW_HEIGHT),
     cells: []
   }))
 
@@ -5814,534 +5021,5 @@ function buildCellKey(rowIndex, colIndex) {
 async function goToFileCenter() {
   await releaseActiveLock(false)
   router.push('/excel-editor/files')
-}</script>
-
-<style lang="scss" scoped>
-.excel-editor-page {
-  min-height: calc(100vh - 84px);
-  padding: 16px;
-  background: #f6f8fb;
 }
-
-.hero-card,
-.summary-card,
-.editor-shell {
-  border: 1px solid #e4e8ef;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: none;
-}
-
-.hero-card {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding: 12px 14px;
-}
-
-.eyebrow {
-  margin: 0 0 4px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #6b7280;
-}
-
-h1 {
-  margin: 0;
-  font-size: 20px;
-  line-height: 1.3;
-  color: #111827;
-}
-
-.hero-desc {
-  margin: 6px 0 0;
-  color: #6b7280;
-  line-height: 1.4;
-  font-size: 13px;
-}
-
-.hero-actions,
-.toolbar-left,
-.toolbar-right {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.hero-actions {
-  align-content: flex-start;
-  justify-content: flex-end;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.summary-card {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-height: 0;
-  padding: 10px 12px;
-}
-
-.summary-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #6b7280;
-}
-
-.summary-card strong {
-  font-size: 14px;
-  line-height: 1.35;
-  color: #111827;
-}
-
-.summary-card span:last-child {
-  color: #6b7280;
-  line-height: 1.35;
-  font-size: 12px;
-}
-
-.editor-shell {
-  padding: 12px;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.toolbar-right {
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.style-toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 8px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #f9fafb;
-}
-
-.formula-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 8px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #ffffff;
-}
-
-.formula-label {
-  min-width: 72px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #4b5563;
-}
-
-.formula-input {
-  flex: 1;
-  min-width: 260px;
-}
-
-.formula-preview {
-  font-size: 12px;
-  color: #6b7280;
-  white-space: nowrap;
-}
-
-.style-toolbar-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: #4b5563;
-  margin-right: 2px;
-}
-
-.style-select {
-  width: 90px;
-}
-
-.style-color-picker {
-  :deep(.el-color-picker__trigger) {
-    border-color: #d1d5db;
-  }
-}
-
-.underline-btn {
-  text-decoration: underline;
-}
-
-.selection-tip {
-  font-size: 12px;
-  color: #4b5563;
-}
-
-.sheet-tabs {
-  margin-bottom: 12px;
-}
-
-.sheet-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.grid-wrap {
-  overflow: auto;
-  max-height: calc(100vh - 240px);
-  min-height: 620px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #fff;
-}
-
-.sheet-stage {
-  position: relative;
-  width: max-content;
-  min-width: 100%;
-}
-
-.sheet-grid {
-  position: relative;
-  z-index: 3;
-  min-width: 100%;
-  border-collapse: collapse;
-}
-
-.sheet-grid td,
-.sheet-grid th {
-  border: 1px solid #e5e7eb;
-}
-
-.sheet-grid thead th {
-  position: sticky;
-  top: 0;
-}
-
-.corner-header {
-  position: sticky;
-  top: 0;
-  left: 0;
-  z-index: 11;
-  min-width: 56px;
-  width: 56px;
-  height: 34px;
-  background: #f3f4f6;
-}
-
-.column-header {
-  position: sticky;
-  top: 0;
-  z-index: 9;
-  padding: 0 18px 0 10px;
-  text-align: center;
-  font-weight: 700;
-  color: #374151;
-  background: #f3f4f6;
-}
-
-.column-label {
-  display: inline-block;
-  line-height: 1;
-}
-
-.sheet-image-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.sheet-image-layer-background {
-  z-index: 1;
-}
-
-.sheet-image-layer-foreground {
-  z-index: 6;
-}
-
-.sheet-image-item {
-  position: absolute;
-  overflow: hidden;
-  contain: layout paint;
-  content-visibility: auto;
-  contain-intrinsic-size: 240px 180px;
-}
-
-.sheet-image-item.background {
-  opacity: 1;
-}
-
-.sheet-image {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: fill;
-  user-select: none;
-  pointer-events: none;
-}
-
-.sheet-cell {
-  position: relative;
-  background: #fff;
-  transition: box-shadow 0.18s ease, background-color 0.18s ease;
-}
-
-.sheet-cell.selected {
-  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.65);
-  background: rgba(37, 99, 235, 0.06);
-}
-
-.sheet-cell.selected .cell-input {
-  background: rgba(37, 99, 235, 0.04);
-}
-
-.sheet-cell.fill-preview {
-  background: rgba(16, 185, 129, 0.08);
-  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.45);
-}
-
-.filter-trigger {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 16px;
-  height: 16px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: #ffffff;
-  color: #6b7280;
-  font-size: 11px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.filter-trigger:hover {
-  color: #2563eb;
-  border-color: #93c5fd;
-  background: #eff6ff;
-}
-
-.fill-handle {
-  position: absolute;
-  right: -4px;
-  bottom: -4px;
-  width: 8px;
-  height: 8px;
-  border: 1px solid #ffffff;
-  border-radius: 2px;
-  background: #2563eb;
-  cursor: crosshair;
-  z-index: 18;
-}
-
-.row-index {
-  position: sticky;
-  left: 0;
-  z-index: 3;
-  min-width: 56px;
-  width: 56px;
-  padding: 0 8px;
-  text-align: center;
-  font-weight: 700;
-  color: #374151;
-  background: #f3f4f6;
-}
-
-.resize-handle {
-  position: absolute;
-  user-select: none;
-}
-
-.col-resize-handle {
-  top: 0;
-  right: -4px;
-  width: 8px;
-  height: 100%;
-  cursor: col-resize;
-}
-
-.row-resize-handle {
-  left: 0;
-  bottom: -4px;
-  width: 100%;
-  height: 8px;
-  cursor: row-resize;
-}
-
-.cell-input {
-  display: block;
-  width: 100%;
-  min-width: 100%;
-  padding: 8px 10px;
-  border: none;
-  outline: none;
-  resize: none;
-  background: transparent;
-  line-height: 1.45;
-  overflow: hidden;
-}
-
-.cell-select {
-  padding-right: 26px;
-}
-
-.sheet-cell.has-validation::after {
-  content: "v";
-  position: absolute;
-  right: 8px;
-  bottom: 6px;
-  font-size: 10px;
-  line-height: 1;
-  color: rgba(55, 65, 81, 0.6);
-  pointer-events: none;
-}
-
-.cell-input.dirty {
-  background: rgba(255, 245, 214, 0.85);
-}
-
-.cell-input.formula {
-  box-shadow: inset 0 0 0 1px rgba(47, 119, 208, 0.14);
-}
-
-.sheet-context-menu {
-  position: fixed;
-  z-index: 3000;
-  min-width: 156px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
-  box-shadow: 0 6px 20px rgba(17, 24, 39, 0.16);
-  overflow: hidden;
-}
-
-.sheet-context-menu button {
-  display: block;
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  background: transparent;
-  text-align: left;
-  font-size: 13px;
-  color: #1f2937;
-  cursor: pointer;
-}
-
-.sheet-context-menu button:hover {
-  background: #eff6ff;
-}
-
-.sort-rule-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 240px;
-  overflow: auto;
-  padding-right: 2px;
-}
-
-.sort-rule-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sort-rule-column {
-  width: 160px;
-}
-
-.sort-rule-direction {
-  width: 120px;
-}
-
-.filter-value-box {
-  width: 100%;
-  max-height: 220px;
-  overflow: auto;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  padding: 8px 10px;
-}
-
-.find-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.shortcut-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.shortcut-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.shortcut-item code {
-  min-width: 160px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: #f3f4f6;
-  color: #111827;
-}
-
-@media (max-width: 1200px) {
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 960px) {
-  .excel-editor-page {
-    padding: 16px;
-  }
-
-  .hero-card,
-  .toolbar,
-  .toolbar-right,
-  .style-toolbar,
-  .formula-toolbar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .formula-preview {
-    white-space: normal;
-  }
-
-  .grid-wrap {
-    min-height: 420px;
-    max-height: calc(100vh - 220px);
-  }
-}
-</style>
-
-
-
-
-
 
